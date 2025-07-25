@@ -6,7 +6,10 @@
 int main(int argc, char **argv){
 
    int num_tokens;
+   int runnable_len;
    PToken tokens[1000];
+   RToken runnable[1000];
+   REnv env = {0};
 
    if(argc < 2){
       char buffer[256];
@@ -19,11 +22,18 @@ int main(int argc, char **argv){
          }
    
          parse_as_tokens(buffer, tokens, &num_tokens);
-         validate_syntax(tokens, num_tokens);
-   
-         for(int i = 0; i < num_tokens; ++i){
-            if(tokens[i].p_type == WORD){
-               free(tokens[i].as.word);
+
+         if(validate_syntax(tokens, num_tokens) != -1){
+            if(build_runnable(tokens, num_tokens, runnable, &runnable_len) != -1){
+               execute_runnable(&env, runnable, runnable_len);
+               /* printf("%d\n", runnable_len);
+               for(int i = 0; i < runnable_len; ++i){
+                  print_rtoken(&runnable[i]);
+                  printf("\n");
+                  if(runnable[i].r_type == WORD){
+                     free(runnable[i].as.word);
+                  }
+               } */
             }
          }
 
@@ -48,12 +58,19 @@ int main(int argc, char **argv){
       fclose(f);
 
       parse_as_tokens(file_buffer, tokens, &num_tokens);
-   
-      for(int i = 0; i < num_tokens; ++i){
-         printf("Token: ");
-         print_ptoken(&tokens[i]);
-         printf("\n");
+
+      if(validate_syntax(tokens, num_tokens) != -1){
+         printf("Syntax Validated\n");
+         if(build_runnable(tokens, num_tokens, runnable, &runnable_len) != -1){
+            printf("Executable was built\n\n");
+            execute_runnable(&env, runnable, runnable_len);
+         }else{
+            printf("Unable to create an executable\n");
+         }
+      }else{
+         printf("Unable to validate syntax");
       }
+      
      
    }
 

@@ -1,0 +1,190 @@
+#include <shmag.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+RToken to_rtoken(PToken *tkn){
+   RToken new_token = {
+      .r_type = tkn->p_type,
+      .as.word = NULL
+   };
+
+   if(tkn->p_type == WORD || tkn->p_type == NUMBER || tkn->p_type == SET_WORD){
+      new_token.as = tkn->as;
+   }
+
+   return new_token;
+}
+
+int op_prec(TokenType type){
+   switch(type){
+      case GT:
+      case LT:
+      case EQ:
+      case PLUS:
+      case MINUS:
+         return 1;
+      case MULT:
+      case DIV:
+         return 2;
+      break;
+      case DUMP:
+         return 3;
+      break;
+      default:
+         fprintf(stderr, "type(%d) is not implemented in op_prec\n", type);
+         return -1;
+   }
+}
+
+static struct {
+   PToken *stack[100];
+   int size;
+   int capacity;
+   int line;
+} expression = {.capacity = 100, .size = 0, .line = -1};
+
+void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens);
+int expression_flush(RToken *runnable, int *num_run_tokens);
+
+int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_run_tokens){
+   int op_index = 0;
+   PToken *val_stack[1000];
+   int stack_head = 0;
+   int expr_line = 0;
+   
+   for(int i = 0; i < num_tokens; ++i){
+      PToken *curr = &tokens[i];
+      switch(curr->p_type){
+         case WORD:
+            // Check if the value is being set
+            if(i + 1 < num_tokens && tokens[i + 1].p_type == SET){
+               val_stack[stack_head++] = curr;
+            }else{
+               expression_push(curr, runnable, &op_index);
+            }
+         break;
+         case NUMBER:
+            expression_push(curr, runnable, &op_index);
+         break;
+         case DUMP:
+         case GT:
+         case LT:
+         case EQ:
+         case PLUS:
+         case MINUS:
+         case DIV:
+         case MULT:
+            expression_push(curr, runnable, &op_index);
+         break;
+         case SET:
+            curr->p_type = SET_WORD;
+            curr->as.word = tokens[i - 1].as.word;
+            val_stack[stack_head++] = curr;
+            expr_line = curr->line;
+         break;
+         case LINE_SEP:
+            if((expr_line = expression_flush(runnable, &op_index)) != 0){
+               if(val_stack[stack_head - 1]->p_type == SET_WORD){
+                  runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
+               }
+            }
+            
+         break;
+         default:
+            fprintf(stderr, "Unknown token type[%d] discovered at %s\n", curr->p_type, ptoken_str(curr));
+            return -1;
+         break;
+      }
+   }
+   
+   *num_run_tokens = op_index;
+   return 0;
+}
+
+void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
+   if(expression.line == -1){
+      expression.line = tkn->line;
+   }else{
+      if(tkn->line != expression.line){
+         fprintf(stderr, "Multiline expression found between lines %d and %d\n", expression.line, tkn->line);
+         exit(1);
+      }
+   }
+   if(tkn->p_type == WORD || tkn->p_type == NUMBER){
+      runnable[*num_run_tokens] = to_rtoken(tkn);
+      *num_run_tokens = *num_run_tokens + 1;
+   }else{
+      while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
+         runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
+         *num_run_tokens = *num_run_tokens + 1;
+         expression.size -= 1;
+      }
+      expression.stack[expression.size++] = tkn;
+   }
+}
+
+int expression_flush(RToken *runnable, int *num_run_tokens){
+   if(expression.line == -1) return 0;
+
+   int tmp = expression.line;
+   expression.line = -1;
+   while(expression.size > 0){
+      runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
+      *num_run_tokens = *num_run_tokens + 1;
+      expression.size -= 1;
+   }
+
+   return tmp;
+}
+
+const char *rtoken_str(const RToken *rtoken){
+   static char _buffer[512];
+
+   switch(rtoken->r_type){
+      case WORD:
+         sprintf(_buffer, "Word(%s)", rtoken->as.word);
+      break;
+      case NUMBER:
+         sprintf(_buffer, "Number(%f)", rtoken->as.number);
+      break;
+      case EQ:
+         sprintf(_buffer, "Equals");
+      break;
+      case GT:
+         sprintf(_buffer, "GreaterThan");
+      break;
+      case LT:
+         sprintf(_buffer, "LessThan");
+      break;
+      case PLUS:
+         sprintf(_buffer, "Plus");
+      break;
+      case MINUS:
+         sprintf(_buffer, "Minus");
+      break;
+      case DIV:
+         sprintf(_buffer, "Div");
+      break;
+      case MULT:
+         sprintf(_buffer, "Mult");
+      break;
+      case SET_WORD:
+         sprintf(_buffer, "SetWord(%s)", rtoken->as.word);
+      break;
+      case LINE_SEP:
+         sprintf(_buffer, "NewLine");
+      break;
+      case DUMP:
+         sprintf(_buffer, "Dump");
+      break;
+      case SET:
+         sprintf(_buffer, "Set(%s)", rtoken->as.word);
+      break;
+   }
+
+   return _buffer;
+}
+
+void print_rtoken(const RToken *rtoken){
+   printf("%s", rtoken_str(rtoken));
+}

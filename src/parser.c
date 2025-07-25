@@ -28,6 +28,16 @@ void set_word_type(PToken *token){
       token->p_type = LT;
    }else if(strcmp(token->as.word, ":=") == 0){
       token->p_type = SET;
+   }else if(strcmp(token->as.word, "+") == 0){
+      token->p_type = PLUS;
+   }else if(strcmp(token->as.word, "-") == 0){
+      token->p_type = MINUS;
+   }else if(strcmp(token->as.word, "*") == 0){
+      token->p_type = MULT;
+   }else if(strcmp(token->as.word, "/") == 0){
+      token->p_type = DIV;
+   }else if(strcmp(token->as.word, ".") == 0){
+      token->p_type = DUMP;
    }else{
       char *end;
       double dbl = strtod(token->as.word, &end);
@@ -83,6 +93,13 @@ const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_toke
       *num_tokens = *num_tokens + 1;
    }
 
+   tokens[*num_tokens] = (PToken){
+      .p_type = LINE_SEP,
+      .line = line_number,
+   };
+
+   *num_tokens = *num_tokens + 1;
+
    line = strchr(line + column, '\n');
    if(line != NULL){
       if(*(line + 1) == '\0')
@@ -123,6 +140,21 @@ const char *ptoken_str(const PToken *ptoken){
       break;
       case SET:
          sprintf(_buffer, "Set[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case PLUS:
+         sprintf(_buffer, "Plus[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case MINUS:
+         sprintf(_buffer, "Minus[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case MULT:
+         sprintf(_buffer, "Mult[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case DIV:
+         sprintf(_buffer, "Divide[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case DUMP:
+         sprintf(_buffer, "dump");
       break;
       default:
          sprintf(_buffer, "Unimplemented[%d:%d]", ptoken->line, ptoken->col);

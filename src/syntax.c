@@ -9,7 +9,6 @@ enum extected_types{
 };
 
 int expect_type(const PToken *tokens, int index, int types);
-void token_errorf(const char *fmt, const PToken *token, ...);
 
 int validate_syntax(PToken *tokens, int num_tokens){
    int i = 0;
@@ -17,8 +16,6 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
    while(i < num_tokens){
       const PToken *curr_token = &tokens[i++];
-      print_ptoken(curr_token);
-      printf("\n");
 
       switch(curr_token->p_type){
          // Skip over WORD/VALUE
@@ -28,20 +25,23 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
          case SET:
             if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
-               token_errorf("Set operator expects a WORD or VALUE after the '='", &tokens[i]);
+               token_errorf("Set operator expects a WORD or VALUE after the ':='", &tokens[i - 1]);
                error = 1;
             }
-            if(i < 2 || !expect_type(tokens, i, E_WORD)){
-               token_errorf("Set operator expects a WORD before the '='", &tokens[i]);
+            if(i < 2 || !expect_type(tokens, i - 2, E_WORD)){
+               token_errorf("Set operator expects a WORD before the ':='", &tokens[i]);
                error = 1;
             }
 
-            if(error) return -1;
          break;
 
          case GT:
          case LT:
          case EQ:
+         case PLUS:
+         case MINUS:
+         case MULT:
+         case DIV:
              // Check rhs
              if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
                token_errorf("WORD or VALUE expected after operator", &tokens[i - 1]);
@@ -53,15 +53,26 @@ int validate_syntax(PToken *tokens, int num_tokens){
                token_errorf("WORD or VALUE expected before operator", &tokens[i - 1]);
                error = 1;
             }
-
-            if(error) return -1;
+         break;
+         case DUMP:
+            if(i + 1 >= num_tokens){
+               token_errorf("dump expects tokens to follow", &tokens[i - 1]);
+               error = 1;
+            }
+            if(!error && !expect_type(tokens, i, E_WORD | E_VALUE)){
+               token_errorf("Cannot print type", &tokens[i]);
+               error = 1;
+            }
+         break;
+         case LINE_SEP:
          break;
    
          default:
             token_errorf("Unimplemented token", curr_token);
-            return -1;
+            error = 1;
          break;
       }
+      if(error) return -1;
    }
    
 
@@ -74,6 +85,10 @@ int expect_type(const PToken *tokens, int index, int types){
          case GT:
          case EQ:
          case LT:
+         case PLUS:
+         case MULT:
+         case DIV:
+         case MINUS:
             return 1;
          break;
          // Do nothing when it is not an operator type
@@ -107,10 +122,10 @@ int expect_type(const PToken *tokens, int index, int types){
    return 0;
 }
 
-void token_errorf(const char *fmt, const PToken *token, ...){
+void _token_errorf(const char *file, const char *func, int line, const char *fmt, const PToken *token, ...){
    char buffer[1024];
 
-   sprintf(buffer, "%s: %s\n", ptoken_str(token), fmt);
+   sprintf(buffer, "%s::%s[%d] - %s: %s\n", file, func, line, ptoken_str(token), fmt);
    va_list args;
    va_start(args, token);
    vfprintf(stderr, buffer, args);
