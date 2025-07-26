@@ -13,6 +13,7 @@ int expect_type(const PToken *tokens, int index, int types);
 int validate_syntax(PToken *tokens, int num_tokens){
    int i = 0;
    int error = 0;
+   int nested_cond = 0;
 
    while(i < num_tokens){
       const PToken *curr_token = &tokens[i++];
@@ -64,6 +65,42 @@ int validate_syntax(PToken *tokens, int num_tokens){
                error = 1;
             }
          break;
+         case IF:
+            if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
+               token_errorf("If Statement expects a value", &tokens[i - 1]);
+               error = 1;
+            }else{
+               int end_match = 0;
+               nested_cond++;
+               for(int j = i; j < num_tokens; ++j){
+                  curr_token = &tokens[j];
+                  if(curr_token->p_type == IF){
+                     end_match++;
+                  }else if(curr_token->p_type == END){
+                     end_match--;
+                  }
+
+                  if(end_match < 0){
+                     break;
+                  }
+               }
+
+               error = end_match >= 0;
+               if(error){
+                  token_errorf("If Statement expects an 'end'", &tokens[i - 1]);
+               }
+            }
+            
+         break;
+
+         case END:
+            nested_cond--;
+            if(nested_cond < 0){
+               token_errorf("Found 'end' without a matching 'if' statement", &tokens[i - 1]);
+               error = 1;
+            }
+         break;
+
          case LINE_SEP:
          break;
    

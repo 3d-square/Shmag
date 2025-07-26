@@ -38,6 +38,10 @@ void set_word_type(PToken *token){
       token->p_type = DIV;
    }else if(strcmp(token->as.word, ".") == 0){
       token->p_type = DUMP;
+   }else if(strcmp(token->as.word, "if") == 0){
+      token->p_type = IF;
+   }else if(strcmp(token->as.word, "end") == 0){
+      token->p_type = END;
    }else{
       char *end;
       double dbl = strtod(token->as.word, &end);
@@ -70,7 +74,6 @@ PToken next_token(const char *line, int curr_line, int *curr_col){
       token_len += 1;
    }
 
-
    // Allocate memory and copy the new token into it
    new_token.as.word = calloc(1, sizeof(char) * (token_len + 1));
    if(new_token.as.word == NULL){
@@ -102,10 +105,11 @@ const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_toke
 
    line = strchr(line + column, '\n');
    if(line != NULL){
-      if(*(line + 1) == '\0')
+      if(*(line + 1) == '\0'){
          return NULL;
-      else 
+      }else{
          return line + 1;
+      }
    }else{
       return NULL;
    }
@@ -113,7 +117,7 @@ const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_toke
 
 void parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
    int line = 0;
-
+   *num_tokens = 0;
    while((lines = parse_line_as_tokens(lines, tokens, num_tokens, line))){
       line += 1;
    }
@@ -154,10 +158,17 @@ const char *ptoken_str(const PToken *ptoken){
          sprintf(_buffer, "Divide[%d:%d]", ptoken->line, ptoken->col);
       break;
       case DUMP:
-         sprintf(_buffer, "dump");
+         sprintf(_buffer, "Dump");
       break;
-      default:
-         sprintf(_buffer, "Unimplemented[%d:%d]", ptoken->line, ptoken->col);
+      case IF:
+         sprintf(_buffer, "If");
+      break;
+      case END:
+         sprintf(_buffer, "End");
+      break;
+      case LINE_SEP:
+      case SET_WORD:
+         sprintf(_buffer, "Unimplemeted");
       break;
    }
 

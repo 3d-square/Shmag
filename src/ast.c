@@ -82,13 +82,36 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
             val_stack[stack_head++] = curr;
             expr_line = curr->line;
          break;
+         case IF:
+            val_stack[stack_head++] = curr;
+            curr->as.cond[0] = -1;
+            expr_line = curr->line;
+         break;
          case LINE_SEP:
             if((expr_line = expression_flush(runnable, &op_index)) != 0){
                if(val_stack[stack_head - 1]->p_type == SET_WORD){
                   runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
+                  stack_head--;
+               }
+               // Make placeholder for if
+               if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[0] == -1){
+                  runnable[op_index] = (RToken){
+                     .r_type = IF,
+                     .as.cond = {0}
+                  };
+                  val_stack[stack_head - 1]->as.cond[0] = op_index;
+                  op_index++;
                }
             }
-            
+         break;
+         case END:
+            // Set if to point to end
+            if(val_stack[stack_head - 1]->p_type == IF){
+               runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index;
+               stack_head--;
+            }else{
+               printf("Something went wrong\n");
+            }
          break;
          default:
             fprintf(stderr, "Unknown token type[%d] discovered at %s\n", curr->p_type, ptoken_str(curr));
@@ -179,6 +202,12 @@ const char *rtoken_str(const RToken *rtoken){
       break;
       case SET:
          sprintf(_buffer, "Set(%s)", rtoken->as.word);
+      break;
+      case IF:
+         sprintf(_buffer, "(%p)If[%d:%d]", rtoken, rtoken->as.cond[0], rtoken->as.cond[1]);
+      break;
+      case END:
+         sprintf(_buffer, "End");
       break;
    }
 

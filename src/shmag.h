@@ -15,6 +15,8 @@ typedef enum {
    EQ,
    GT,
    LT,
+   IF,
+   END,
    DUMP,
    SET,
 } TokenType;
@@ -22,6 +24,7 @@ typedef enum {
 typedef union {
    char *word;
    double number;
+   int cond[2];
 } MultiVal;
 
 typedef struct {

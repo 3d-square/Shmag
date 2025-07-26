@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int is_truthy(MultiVal val);
+
 int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
    int op_index = 0;
    MultiVal stack[1000];
@@ -57,6 +59,13 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
          case DUMP:
             printf("%f\n", stack[--stack_head].number);
          break;
+         case IF:
+            if(!is_truthy(stack[stack_head - 1])){
+               // printf("%s\n", rtoken_str(curr));
+               op_index = curr->as.cond[0];
+            }
+            stack_head--;
+         break;
          default:
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));
          return 1;
@@ -66,4 +75,9 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
    }
 
    return 0;
+}
+
+
+int is_truthy(MultiVal val){
+   return (int)val.number != 0;
 }
