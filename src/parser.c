@@ -42,6 +42,8 @@ void set_word_type(PToken *token){
       token->p_type = IF;
    }else if(strcmp(token->as.word, "end") == 0){
       token->p_type = END;
+   }else if(strcmp(token->as.word, "while") == 0){
+      token->p_type = WHILE;
    }else{
       char *end;
       double dbl = strtod(token->as.word, &end);
@@ -167,8 +169,16 @@ const char *ptoken_str(const PToken *ptoken){
          sprintf(_buffer, "End");
       break;
       case LINE_SEP:
+         sprintf(_buffer, "line_sep");
+      break;
+      case GOTO:
+         sprintf(_buffer, "goto");
+      break;
+      case WHILE:
+         sprintf(_buffer, "While");
+      break;
       case SET_WORD:
-         sprintf(_buffer, "Unimplemeted");
+         sprintf(_buffer, "SetWord(%s)", ptoken->as.word);
       break;
    }
 

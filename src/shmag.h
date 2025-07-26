@@ -17,6 +17,8 @@ typedef enum {
    LT,
    IF,
    END,
+   WHILE,
+   GOTO,
    DUMP,
    SET,
 } TokenType;

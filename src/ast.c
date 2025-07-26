@@ -79,12 +79,18 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
          case SET:
             curr->p_type = SET_WORD;
             curr->as.word = tokens[i - 1].as.word;
-            val_stack[stack_head++] = curr;
+            val_stack[stack_head - 1] = curr;
             expr_line = curr->line;
          break;
          case IF:
             val_stack[stack_head++] = curr;
             curr->as.cond[0] = -1;
+            expr_line = curr->line;
+         break;
+         case WHILE:
+            val_stack[stack_head++] = curr;
+            curr->as.cond[0] = -1;
+            curr->as.cond[1] = op_index - 1; // Start of while conditional
             expr_line = curr->line;
          break;
          case LINE_SEP:
@@ -101,13 +107,33 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
                   };
                   val_stack[stack_head - 1]->as.cond[0] = op_index;
                   op_index++;
+               }else if(val_stack[stack_head - 1]->p_type == WHILE && val_stack[stack_head - 1]->as.cond[0] == -1){
+                   runnable[op_index] = (RToken){
+                     .r_type = WHILE,
+                     .as.cond = {0}
+                  };
+                  val_stack[stack_head - 1]->as.cond[0] = op_index;
+                  op_index++;                 
                }
             }
          break;
          case END:
             // Set if to point to end
+            // for(int k = 0; k < stack_head; ++k){
+            //    printf("Stack[%d](%p) - %s[%d]\n", k, val_stack[k], ptoken_str(val_stack[k]), val_stack[k]->as.cond[0]);
+            // }
+            // printf("op_index = %d\n", op_index);
             if(val_stack[stack_head - 1]->p_type == IF){
+               runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index - 1;
+               stack_head--;
+            }else if(val_stack[stack_head - 1]->p_type == WHILE){
+               // same as if but also add goto statement to go back to start of while condition
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index;
+               runnable[val_stack[stack_head - 1]->as.cond[0]].r_type = IF;
+               runnable[op_index++] = (RToken) {
+                  .r_type = GOTO,
+                  .as.cond = {val_stack[stack_head - 1]->as.cond[1], 0}
+               };
                stack_head--;
             }else{
                printf("Something went wrong\n");
@@ -203,8 +229,14 @@ const char *rtoken_str(const RToken *rtoken){
       case SET:
          sprintf(_buffer, "Set(%s)", rtoken->as.word);
       break;
+      case WHILE:
+         sprintf(_buffer, "While");
+      break;
+      case GOTO:
+         sprintf(_buffer, "GOTO(%d)", rtoken->as.cond[0]);
+      break;
       case IF:
-         sprintf(_buffer, "(%p)If[%d:%d]", rtoken, rtoken->as.cond[0], rtoken->as.cond[1]);
+         sprintf(_buffer, "If[%d:%d]", rtoken->as.cond[0], rtoken->as.cond[1]);
       break;
       case END:
          sprintf(_buffer, "End");

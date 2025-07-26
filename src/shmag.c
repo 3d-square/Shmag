@@ -5,7 +5,13 @@
 
 void print_executable(RToken *exe, int len){
    for(int i = 0; i < len; ++i){
-      printf("%s\n", rtoken_str(&exe[i]));
+      printf("%d: %s\n", i, rtoken_str(&exe[i]));
+   }
+}
+
+void print_im(PToken *exe, int len){
+   for(int i = 0; i < len; ++i){
+      printf("%d: %s\n", i, ptoken_str(&exe[i]));
    }
 }
 
@@ -72,9 +78,10 @@ int main(int argc, char **argv){
 
       if(validate_syntax(tokens, num_tokens) != -1){
          printf("Syntax Validated\n");
+         // print_im(tokens, num_tokens);
          if(build_runnable(tokens, num_tokens, runnable, &runnable_len) != -1){
             printf("Executable was built\n\n");
-
+            // print_executable(runnable, runnable_len);
             execute_runnable(&env, runnable, runnable_len);
          }else{
             printf("Unable to create an executable\n");

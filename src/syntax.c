@@ -35,7 +35,6 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
 
          break;
-
          case GT:
          case LT:
          case EQ:
@@ -65,6 +64,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
                error = 1;
             }
          break;
+         case WHILE:
          case IF:
             if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
                token_errorf("If Statement expects a value", &tokens[i - 1]);
@@ -74,7 +74,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
                nested_cond++;
                for(int j = i; j < num_tokens; ++j){
                   curr_token = &tokens[j];
-                  if(curr_token->p_type == IF){
+                  if(curr_token->p_type == IF || curr_token->p_type == WHILE){
                      end_match++;
                   }else if(curr_token->p_type == END){
                      end_match--;

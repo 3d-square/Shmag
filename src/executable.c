@@ -25,6 +25,7 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
             stack_head--;
          break;
          case EQ:
+            // printf("%f %f, %d\n", stack[stack_head - 2].number, stack[stack_head - 1].number, stack[stack_head - 2].number == stack[stack_head - 1].number);
             stack[stack_head - 2].number = stack[stack_head - 2].number == stack[stack_head - 1].number;
             stack_head--;
          break;
@@ -56,6 +57,10 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
                return 1;
             }
          break;
+         case GOTO:
+            // printf("Going to %d\n", curr->as.cond[0]);
+            op_index = curr->as.cond[0];
+         break;
          case DUMP:
             printf("%f\n", stack[--stack_head].number);
          break;
@@ -70,7 +75,7 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));
          return 1;
       }
-
+      // printf("op_index = %d\n", op_index);
       op_index++;
    }
 
