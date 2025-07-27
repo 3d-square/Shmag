@@ -1,6 +1,7 @@
 #include <shmag.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 int is_truthy(MultiVal val);
 
@@ -43,6 +44,14 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
          break;
          case DIV:
             stack[stack_head - 2].number = stack[stack_head - 2].number / stack[stack_head - 1].number;
+            stack_head--;
+         break;
+         case MOD:
+            if(floor(stack[stack_head - 2].number) != stack[stack_head - 2].number || floor(stack[stack_head - 1].number) != stack[stack_head - 1].number){
+               fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
+               return 1;
+            }
+            stack[stack_head - 2].number = (long)stack[stack_head - 2].number % (long)stack[stack_head - 1].number;
             stack_head--;
          break;
          case SET_WORD:

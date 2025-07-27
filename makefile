@@ -10,7 +10,7 @@ DEPS=src/shmag.h
 all: shmag
 
 shmag: $(OBJS) $(DEPS)
-	$(CC) $(CFLAGS) $(INC) $^ -o shmag
+	$(CC) $(CFLAGS) $(INC) $^ -o shmag -lm
 
 src/%.o: src/%.c $(DEPS)
 	$(CC) $(CFLAGS) $(INC) -c  $< -o $@ 

@@ -9,6 +9,7 @@ typedef enum {
    WORD,
    NUMBER,
    PLUS,
+   MOD,
    MINUS,
    MULT,
    DIV,

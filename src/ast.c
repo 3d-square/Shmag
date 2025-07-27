@@ -25,6 +25,7 @@ int op_prec(TokenType type){
          return 1;
       case MULT:
       case DIV:
+      case MOD:
          return 2;
       break;
       case DUMP:
@@ -72,6 +73,7 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
          case EQ:
          case PLUS:
          case MINUS:
+         case MOD:
          case DIV:
          case MULT:
             expression_push(curr, runnable, &op_index);

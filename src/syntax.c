@@ -40,6 +40,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
          case EQ:
          case PLUS:
          case MINUS:
+         case MOD:
          case MULT:
          case DIV:
              // Check rhs
@@ -125,6 +126,7 @@ int expect_type(const PToken *tokens, int index, int types){
          case PLUS:
          case MULT:
          case DIV:
+         case MOD:
          case MINUS:
             return 1;
          break;

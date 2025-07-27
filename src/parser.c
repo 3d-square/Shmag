@@ -38,6 +38,8 @@ void set_word_type(PToken *token){
       token->p_type = DIV;
    }else if(strcmp(token->as.word, ".") == 0){
       token->p_type = DUMP;
+   }else if(strcmp(token->as.word, "%") == 0){
+      token->p_type = MOD;
    }else if(strcmp(token->as.word, "if") == 0){
       token->p_type = IF;
    }else if(strcmp(token->as.word, "end") == 0){
@@ -167,6 +169,9 @@ const char *ptoken_str(const PToken *ptoken){
       break;
       case END:
          sprintf(_buffer, "End");
+      break;
+      case MOD:
+         sprintf(_buffer, "Mod");
       break;
       case LINE_SEP:
          sprintf(_buffer, "line_sep");
