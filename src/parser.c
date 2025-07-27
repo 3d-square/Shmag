@@ -44,6 +44,8 @@ void set_word_type(PToken *token){
       token->p_type = IF;
    }else if(strcmp(token->as.word, "end") == 0){
       token->p_type = END;
+   }else if(strcmp(token->as.word, "else") == 0){
+      token->p_type = ELSE;
    }else if(strcmp(token->as.word, "while") == 0){
       token->p_type = WHILE;
    }else{
@@ -166,6 +168,9 @@ const char *ptoken_str(const PToken *ptoken){
       break;
       case IF:
          sprintf(_buffer, "If");
+      break;
+      case ELSE:
+         sprintf(_buffer, "Else");
       break;
       case END:
          sprintf(_buffer, "End");

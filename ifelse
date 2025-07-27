@@ -1,0 +1,12 @@
+i := 0
+
+while i < 6
+
+   if i % 2 == 0
+      . i
+   else
+      . 0
+   end
+
+   i := i + 1
+end

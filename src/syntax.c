@@ -13,7 +13,8 @@ int expect_type(const PToken *tokens, int index, int types);
 int validate_syntax(PToken *tokens, int num_tokens){
    int i = 0;
    int error = 0;
-   int nested_cond = 0;
+   TokenType nested[256];
+   int num_nested = 0;
 
    while(i < num_tokens){
       const PToken *curr_token = &tokens[i++];
@@ -67,12 +68,12 @@ int validate_syntax(PToken *tokens, int num_tokens){
          break;
          case WHILE:
          case IF:
+            nested[num_nested++] = curr_token->p_type;
             if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
                token_errorf("If Statement expects a value", &tokens[i - 1]);
                error = 1;
             }else{
                int end_match = 0;
-               nested_cond++;
                for(int j = i; j < num_tokens; ++j){
                   curr_token = &tokens[j];
                   if(curr_token->p_type == IF || curr_token->p_type == WHILE){
@@ -93,11 +94,20 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
             
          break;
-
+         case ELSE:
+            if(num_nested <= 0){
+               token_errorf("Found 'else' without a matching 'if' statement", &tokens[i - 1]);
+               error = 1;
+            }else{
+               if(nested[num_nested - 1] != IF){
+                  fprintf(stderr, "else statement expects if statement preceeding \n");
+                  error = 1;
+               }
+            }
+         break;
          case END:
-            nested_cond--;
-            if(nested_cond < 0){
-               token_errorf("Found 'end' without a matching 'if' statement", &tokens[i - 1]);
+            if(num_nested <= 0){
+               token_errorf("Found 'end' without a matching control statement", &tokens[i - 1]);
                error = 1;
             }
          break;

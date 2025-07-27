@@ -87,7 +87,15 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
          case IF:
             val_stack[stack_head++] = curr;
             curr->as.cond[0] = -1;
+            curr->as.cond[1] = -1;
             expr_line = curr->line;
+         break;
+         case ELSE:
+            val_stack[stack_head - 1]->as.cond[1] = op_index;
+            runnable[op_index++] = (RToken){
+               .r_type = GOTO,
+               .as.cond = {-1},
+            };
          break;
          case WHILE:
             val_stack[stack_head++] = curr;
@@ -120,14 +128,15 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
             }
          break;
          case END:
-            // Set if to point to end
-            // for(int k = 0; k < stack_head; ++k){
-            //    printf("Stack[%d](%p) - %s[%d]\n", k, val_stack[k], ptoken_str(val_stack[k]), val_stack[k]->as.cond[0]);
-            // }
-            // printf("op_index = %d\n", op_index);
-            if(val_stack[stack_head - 1]->p_type == IF){
+            if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[1] == -1){
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index - 1;
                stack_head--;
+            }else if(val_stack[stack_head - 1]->p_type == IF){
+               // printf("%d, %d\n", op_index - 1, val_stack[stack_head - 1]->as.cond[1]);
+               runnable[val_stack[stack_head - 1]->as.cond[1]].as.cond[0] = op_index - 1; // GOTO statement
+               runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = val_stack[stack_head - 1]->as.cond[1]; // If statement
+               stack_head--;
+
             }else if(val_stack[stack_head - 1]->p_type == WHILE){
                // same as if but also add goto statement to go back to start of while condition
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index;
@@ -219,6 +228,9 @@ const char *rtoken_str(const RToken *rtoken){
       case MULT:
          sprintf(_buffer, "Mult");
       break;
+      case MOD:
+         sprintf(_buffer, "Mod");
+      break;
       case SET_WORD:
          sprintf(_buffer, "SetWord(%s)", rtoken->as.word);
       break;
@@ -239,6 +251,9 @@ const char *rtoken_str(const RToken *rtoken){
       break;
       case IF:
          sprintf(_buffer, "If[%d:%d]", rtoken->as.cond[0], rtoken->as.cond[1]);
+      break;
+      case ELSE:
+         sprintf(_buffer, "Else[%d:%d]", rtoken->as.cond[0], rtoken->as.cond[1]);
       break;
       case END:
          sprintf(_buffer, "End");

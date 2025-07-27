@@ -17,6 +17,7 @@ typedef enum {
    GT,
    LT,
    IF,
+   ELSE,
    END,
    WHILE,
    GOTO,
