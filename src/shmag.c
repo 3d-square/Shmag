@@ -3,10 +3,14 @@
 #include <string.h>
 #include <stdlib.h>
 
-void print_executable(RToken *exe, int len){
+void print_executable(const char *name, RToken *exe, int len){
+   char buffer[256];
+   sprintf(buffer, "%s.im", name);
+   FILE *fp = fopen(buffer, "w");
    for(int i = 0; i < len; ++i){
-      printf("%d: %s\n", i, rtoken_str(&exe[i]));
+      fprintf(fp, "%d: %s\n", i, rtoken_str(&exe[i]));
    }
+   fclose(fp);
 }
 
 void print_im(PToken *exe, int len){
@@ -38,7 +42,6 @@ void read_to_buffer(const char *file_name, char *buffer, int max_length){
 }
 
 int main(int argc, char **argv){
-
    int num_tokens;
    int runnable_len;
    PToken tokens[1000];
@@ -81,7 +84,7 @@ int main(int argc, char **argv){
          // print_im(tokens, num_tokens);
          if(build_runnable(tokens, num_tokens, runnable, &runnable_len) != -1){
             printf("Executable was built\n\n");
-            // print_executable(runnable, runnable_len);
+            print_executable(argv[1], runnable, runnable_len);
             execute_runnable(&env, runnable, runnable_len);
          }else{
             printf("Unable to create an executable\n");

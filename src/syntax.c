@@ -94,13 +94,14 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
             
          break;
+         case ELIF:
          case ELSE:
             if(num_nested <= 0){
                token_errorf("Found 'else' without a matching 'if' statement", &tokens[i - 1]);
                error = 1;
             }else{
-               if(nested[num_nested - 1] != IF){
-                  fprintf(stderr, "else statement expects if statement preceeding \n");
+               if(nested[num_nested - 1] != IF && nested[num_nested - 1] != ELIF){
+                  fprintf(stderr, "else/elif statement expects if statement preceeding \n");
                   error = 1;
                }
             }

@@ -19,6 +19,7 @@ typedef enum {
    IF,
    ELSE,
    END,
+   ELIF,
    WHILE,
    GOTO,
    DUMP,

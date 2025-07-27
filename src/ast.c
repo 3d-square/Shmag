@@ -90,6 +90,18 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
             curr->as.cond[1] = -1;
             expr_line = curr->line;
          break;
+         case ELIF:
+            val_stack[stack_head - 1]->as.cond[1] = op_index;
+
+            val_stack[stack_head++] = curr;
+            curr->as.cond[0] = -1;
+            curr->as.cond[1] = -1;
+
+            runnable[op_index++] = (RToken){
+               .r_type = GOTO,
+               .as.cond = {-1},
+            };
+         break;
          case ELSE:
             val_stack[stack_head - 1]->as.cond[1] = op_index;
             runnable[op_index++] = (RToken){
@@ -117,6 +129,13 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
                   };
                   val_stack[stack_head - 1]->as.cond[0] = op_index;
                   op_index++;
+               }else if(val_stack[stack_head - 1]->p_type == ELIF && val_stack[stack_head - 1]->as.cond[0] == -1){
+                  runnable[op_index] = (RToken){
+                     .r_type = IF,
+                     .as.cond = {0}
+                  };
+                  val_stack[stack_head - 1]->as.cond[0] = op_index;
+                  op_index++;
                }else if(val_stack[stack_head - 1]->p_type == WHILE && val_stack[stack_head - 1]->as.cond[0] == -1){
                    runnable[op_index] = (RToken){
                      .r_type = WHILE,
@@ -128,15 +147,34 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
             }
          break;
          case END:
-            if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[1] == -1){
+            if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[1] == -1){ // No else statement
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index - 1;
                stack_head--;
-            }else if(val_stack[stack_head - 1]->p_type == IF){
+            }else if(val_stack[stack_head - 1]->p_type == IF){ // If statement has else statement
                // printf("%d, %d\n", op_index - 1, val_stack[stack_head - 1]->as.cond[1]);
                runnable[val_stack[stack_head - 1]->as.cond[1]].as.cond[0] = op_index - 1; // GOTO statement
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = val_stack[stack_head - 1]->as.cond[1]; // If statement
                stack_head--;
+            }else if(val_stack[stack_head - 1]->p_type == ELIF){
+               /*
+                * op_index - 1 - ALL GOTO STATEMENTS (Exits from the ifs)
+                * cond[1]      - next if statement
+                */
 
+               // check if there was an else statement 
+               if(val_stack[stack_head - 1]->as.cond[1] == -1){
+                  val_stack[stack_head - 1]->as.cond[1] = op_index - 1;
+               }
+               while(val_stack[stack_head - 1]->p_type == ELIF){
+                  runnable[val_stack[stack_head - 1]->as.cond[1]].as.cond[0] = op_index - 1; // GOTO statement
+                  runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = val_stack[stack_head - 1]->as.cond[1]; // If statement
+                  stack_head--;
+               }
+
+               // Last do the if statement
+               runnable[val_stack[stack_head - 1]->as.cond[1]].as.cond[0] = op_index - 1; // GOTO statement
+               runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = val_stack[stack_head - 1]->as.cond[1]; // If statement
+               stack_head--;
             }else if(val_stack[stack_head - 1]->p_type == WHILE){
                // same as if but also add goto statement to go back to start of while condition
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index;
@@ -254,6 +292,9 @@ const char *rtoken_str(const RToken *rtoken){
       break;
       case ELSE:
          sprintf(_buffer, "Else[%d:%d]", rtoken->as.cond[0], rtoken->as.cond[1]);
+      break;
+      case ELIF:
+         sprintf(_buffer, "Elif[%d:%d]", rtoken->as.cond[0], rtoken->as.cond[1]);
       break;
       case END:
          sprintf(_buffer, "End");

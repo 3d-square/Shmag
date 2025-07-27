@@ -4,9 +4,11 @@ while i < 6
 
    if i % 2 == 0
       . i
-   else
-      . 0
+   elif i % 3 == 0
+      . -3
    end
 
    i := i + 1
 end
+
+. 100
