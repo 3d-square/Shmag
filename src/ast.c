@@ -42,7 +42,8 @@ static struct {
    int size;
    int capacity;
    int line;
-} expression = {.capacity = 100, .size = 0, .line = -1};
+   int first_op;
+} expression = {.capacity = 100, .size = 0, .line = -1, .first_op = 0};
 
 void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens);
 int expression_flush(RToken *runnable, int *num_run_tokens);
@@ -68,6 +69,8 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
             expression_push(curr, runnable, &op_index);
          break;
          case DUMP:
+            val_stack[stack_head++] = curr;
+         break;
          case GT:
          case LT:
          case EQ:
@@ -120,9 +123,7 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
                if(val_stack[stack_head - 1]->p_type == SET_WORD){
                   runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                   stack_head--;
-               }
-               // Make placeholder for if
-               if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[0] == -1){
+               }else if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[0] == -1){
                   runnable[op_index] = (RToken){
                      .r_type = IF,
                      .as.cond = {0}
@@ -143,6 +144,11 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
                   };
                   val_stack[stack_head - 1]->as.cond[0] = op_index;
                   op_index++;                 
+               }else if(val_stack[stack_head - 1]->p_type == DUMP){
+                  runnable[op_index] = (RToken){
+                     .r_type = DUMP,
+                  };
+                  op_index++;
                }
             }
          break;
@@ -212,6 +218,13 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
       runnable[*num_run_tokens] = to_rtoken(tkn);
       *num_run_tokens = *num_run_tokens + 1;
    }else{
+      if(expression.first_op == 0){
+         runnable[*num_run_tokens] = (RToken){
+            .r_type = INIT_SHM,
+         };
+         *num_run_tokens = *num_run_tokens + 1;
+         expression.first_op = 1;
+      }
       while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
          runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
          *num_run_tokens = *num_run_tokens + 1;
@@ -222,14 +235,24 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
 }
 
 int expression_flush(RToken *runnable, int *num_run_tokens){
-   if(expression.line == -1) return 0;
-
    int tmp = expression.line;
+   int tmp2 = expression.first_op;
+   if(expression.line == -1){
+      return 0;
+   }
+
+   expression.first_op = 0;
    expression.line = -1;
    while(expression.size > 0){
       runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
       *num_run_tokens = *num_run_tokens + 1;
       expression.size -= 1;
+   }
+   if(tmp2 == 1){
+      runnable[*num_run_tokens] = (RToken){
+         .r_type = PUSH_SHM,
+      };
+      *num_run_tokens = *num_run_tokens + 1;
    }
 
    return tmp;
@@ -295,6 +318,12 @@ const char *rtoken_str(const RToken *rtoken){
       break;
       case ELIF:
          sprintf(_buffer, "Elif[%d:%d]", rtoken->as.cond[0], rtoken->as.cond[1]);
+      break;
+      case INIT_SHM:
+         sprintf(_buffer, "InitShm");
+      break;
+      case PUSH_SHM:
+         sprintf(_buffer, "PushShm");
       break;
       case END:
          sprintf(_buffer, "End");

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <shmag.h>
 #include <string.h>
+#include <stdio.h>
 
 int hash_function(char *key){
    int sum    = 0,
@@ -31,27 +32,34 @@ RNode *node_search_rmap(RMap *map, char *key, int *hash){
    return NULL;
 }
 
-MultiVal *search_rmap(RMap *map, char *key){
+ShmObj *search_rmap(RMap *map, char *key){
    int hash;
    RNode *node = node_search_rmap(map, key, &hash);
 
    if(node){
-      return &node->value;
+      return &node->obj;
    }
 
    return NULL;
 }
 
-void insert_rmap(RMap *map, char *key, MultiVal value){
+void insert_rmap(RMap *map, char *key, ShmType type, MultiVal value){
    int bucket;
    RNode *node = node_search_rmap(map, key, &bucket);
 
+   // Node was found
    if(node){
-      node->value = value;
+      if(type != node->obj.obj_type){
+         fprintf(stderr, "Unable to assign type %s to type %s\n", shm_type_str(node->obj.obj_type), shm_type_str(type));
+         exit(1);
+      }
+      
+      node->obj.as = value;
    }else{
       node = malloc(sizeof(RNode));
       node->key = key;
-      node->value = value;
+      node->obj.obj_type = type;
+      node->obj.as = value;
       node->next = NULL;
    
       if(map->arr[bucket] == NULL){
@@ -84,4 +92,19 @@ void delete_rmap(RMap *map, char *key){
       prev = curr;
       curr = curr->next;
    }
+}
+
+const char *shm_type_str(ShmType type){
+   switch(type){
+      case INT:
+         return "Integer";
+      case DBL:
+         return "Float";
+      case STR:
+         return "String";
+      case SHM_NULL:
+         return "None";
+   }
+
+   return NULL;
 }

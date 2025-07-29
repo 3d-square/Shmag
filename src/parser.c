@@ -195,6 +195,9 @@ const char *ptoken_str(const PToken *ptoken){
       case SET_WORD:
          sprintf(_buffer, "SetWord(%s)", ptoken->as.word);
       break;
+      case INIT_SHM:
+      case PUSH_SHM:
+      break;
    }
 
    return _buffer;

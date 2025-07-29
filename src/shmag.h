@@ -7,6 +7,7 @@ typedef enum {
    LINE_SEP,
    SET_WORD,
    WORD,
+   // WORD_LIT,
    NUMBER,
    PLUS,
    MOD,
@@ -24,13 +25,28 @@ typedef enum {
    GOTO,
    DUMP,
    SET,
+   INIT_SHM,
+   PUSH_SHM,
 } TokenType;
 
 typedef union {
    char *word;
    double number;
    int cond[2];
+   void *data;
 } MultiVal;
+
+typedef enum {
+   DBL,
+   INT,
+   STR,
+   SHM_NULL,
+} ShmType;
+
+typedef struct {
+   ShmType obj_type;
+   MultiVal as;
+} ShmObj;
 
 typedef struct {
    TokenType p_type;
@@ -46,7 +62,7 @@ typedef struct {
 
 typedef struct node {
    char *key;
-   MultiVal value;
+   ShmObj obj;
    struct node *next;
 } RNode;
 
@@ -79,8 +95,10 @@ void print_rtoken(const RToken *rtoken);
 
 /* Map Functions */
 void delete_rmap(RMap *map, char *key);
-void insert_rmap(RMap *map, char *key, MultiVal value);
-MultiVal *search_rmap(RMap *map, char *key);
+void insert_rmap(RMap *map, char *key, ShmType type, MultiVal value);
+ShmObj *search_rmap(RMap *map, char *key);
 RNode *node_search_rmap(RMap *map, char *key, int *hash);
 int hash_function(char *key);
+
+const char *shm_type_str(ShmType type);
 #endif

@@ -5,62 +5,47 @@
 
 int is_truthy(MultiVal val);
 
+void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *result);
+
 int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
    int op_index = 0;
    MultiVal stack[1000];
-   MultiVal *multi_ptr;
+   ShmObj *obj_ptr;
+   ShmObj result;
    int stack_head = 0;
    while(op_index < runnable_len){
       const RToken *curr = &runnable[op_index];
-
+      printf("Token: %s\n", rtoken_str(curr));
       switch(curr->r_type){
          case NUMBER:
             stack[stack_head++] = curr->as;
          break;
+         case INIT_SHM:
+            perform_shm_operation(curr->r_type, SHM_NULL, stack[stack_head - 1], &result);
+            stack_head--;
+         break;
+         case PUSH_SHM:
+            stack[stack_head] = result.as;
+            stack_head += 1;
+         break;
          case GT:
-            stack[stack_head - 2].number = stack[stack_head - 2].number > stack[stack_head - 1].number;
-            stack_head--;
-         break;
          case LT:
-            stack[stack_head - 2].number = stack[stack_head - 2].number < stack[stack_head - 1].number;
-            stack_head--;
-         break;
          case EQ:
-            // printf("%f %f, %d\n", stack[stack_head - 2].number, stack[stack_head - 1].number, stack[stack_head - 2].number == stack[stack_head - 1].number);
-            stack[stack_head - 2].number = stack[stack_head - 2].number == stack[stack_head - 1].number;
-            stack_head--;
-         break;
          case PLUS:
-            stack[stack_head - 2].number = stack[stack_head - 2].number + stack[stack_head - 1].number;
-            stack_head--;
-         break;
          case MINUS:
-            stack[stack_head - 2].number = stack[stack_head - 2].number - stack[stack_head - 1].number;
-            stack_head--;
-         break;
          case MULT:
-            stack[stack_head - 2].number = stack[stack_head - 2].number * stack[stack_head - 1].number;
-            stack_head--;
-         break;
          case DIV:
-            stack[stack_head - 2].number = stack[stack_head - 2].number / stack[stack_head - 1].number;
-            stack_head--;
-         break;
          case MOD:
-            if(floor(stack[stack_head - 2].number) != stack[stack_head - 2].number || floor(stack[stack_head - 1].number) != stack[stack_head - 1].number){
-               fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
-               return 1;
-            }
-            stack[stack_head - 2].number = (long)stack[stack_head - 2].number % (long)stack[stack_head - 1].number;
+            perform_shm_operation(curr->r_type, DBL, stack[stack_head - 1], &result);
             stack_head--;
          break;
          case SET_WORD:
-            insert_rmap(&env->variables, curr->as.word, stack[stack_head - 1]);
+            insert_rmap(&env->variables, curr->as.word, DBL, stack[stack_head - 1]);
             stack_head--;
          break;
          case WORD:
-            if((multi_ptr = search_rmap(&env->variables, curr->as.word)) != NULL){
-               stack[stack_head++] = *multi_ptr;
+            if((obj_ptr = search_rmap(&env->variables, curr->as.word)) != NULL){
+               stack[stack_head++] = obj_ptr->as;
             }else{
                fprintf(stderr, "Variable '%s' has not been set\n", curr->as.word);
                return 1;
@@ -94,4 +79,45 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
 
 int is_truthy(MultiVal val){
    return (int)val.number != 0;
+}
+
+void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *result){
+   if(shmType == SHM_NULL){
+      result->as = val;
+      return;
+   }
+   
+   switch(op){
+      case GT:
+         result->as.number = result->as.number > val.number;
+      break;
+      case LT:
+         result->as.number = result->as.number < val.number;
+      break;
+      case EQ:
+         result->as.number = result->as.number == val.number;
+      break;
+      case PLUS:
+         result->as.number = result->as.number + val.number;
+      break;
+      case MINUS:
+         result->as.number = result->as.number - val.number;
+      break;
+      case MULT:
+         result->as.number = result->as.number * val.number;
+      break;
+      case DIV:
+         result->as.number = result->as.number / val.number;
+      break;
+      case MOD:
+         if(floor(result->as.number) != result->as.number || floor(val.number) != val.number){
+            fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
+            exit(1);
+         }
+         result->as.number = (long)result->as.number % (long)val.number;
+      break;
+      default:
+         fprintf(stderr, "Invalid Operand\n");
+         exit(1);
+   }
 }
