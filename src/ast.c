@@ -1,6 +1,7 @@
 #include <shmag.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 RToken to_rtoken(PToken *tkn){
    RToken new_token = {
@@ -39,14 +40,17 @@ int op_prec(TokenType type){
 
 static struct {
    PToken *stack[100];
+   int types[100];
+   int types_head;
    int size;
    int capacity;
    int line;
    int first_op;
-} expression = {.capacity = 100, .size = 0, .line = -1, .first_op = 0};
+} expression = {.types_head = 0, .capacity = 100, .size = 0, .line = -1, .first_op = 0};
 
 void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens);
 int expression_flush(RToken *runnable, int *num_run_tokens);
+void encode_operand(RToken *tkn);
 
 int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_run_tokens){
    int op_index = 0;
@@ -149,6 +153,7 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
                      .r_type = DUMP,
                   };
                   op_index++;
+                  stack_head--;
                }
             }
          break;
@@ -191,7 +196,7 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
                };
                stack_head--;
             }else{
-               printf("Something went wrong\n");
+               printf("%s - Something went wrong\n", ptoken_str(val_stack[stack_head - 1]));
             }
          break;
          default:
@@ -215,6 +220,16 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
       }
    }
    if(tkn->p_type == WORD || tkn->p_type == NUMBER){
+      if(tkn->p_type == NUMBER){
+         expression.types[expression.types_head] = floor(tkn->as.number) == tkn->as.number;
+         if(expression.types[expression.types_head]){
+            // tkn->as.decimal = (long)tkn->as.number;
+         }
+      }else{
+         expression.types[expression.types_head] = 0;
+      }
+
+      expression.types_head++;
       runnable[*num_run_tokens] = to_rtoken(tkn);
       *num_run_tokens = *num_run_tokens + 1;
    }else{
@@ -227,6 +242,9 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
       }
       while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
          runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
+
+         encode_operand(&runnable[*num_run_tokens]);
+
          *num_run_tokens = *num_run_tokens + 1;
          expression.size -= 1;
       }
@@ -245,6 +263,8 @@ int expression_flush(RToken *runnable, int *num_run_tokens){
    expression.line = -1;
    while(expression.size > 0){
       runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
+      encode_operand(&runnable[*num_run_tokens]);
+
       *num_run_tokens = *num_run_tokens + 1;
       expression.size -= 1;
    }
@@ -255,13 +275,15 @@ int expression_flush(RToken *runnable, int *num_run_tokens){
       *num_run_tokens = *num_run_tokens + 1;
    }
 
+   expression.types_head = 0;
+
    return tmp;
 }
 
 const char *rtoken_str(const RToken *rtoken){
    static char _buffer[512];
 
-   switch(rtoken->r_type){
+   switch(OP_MASK(rtoken->r_type)){
       case WORD:
          sprintf(_buffer, "Word(%s)", rtoken->as.word);
       break;
@@ -335,4 +357,20 @@ const char *rtoken_str(const RToken *rtoken){
 
 void print_rtoken(const RToken *rtoken){
    printf("%s", rtoken_str(rtoken));
+}
+
+void encode_operand(RToken *tkn){
+   int op_type = 0;
+  // 0 means double, 1 means long
+  if(expression.types[expression.types_head - 1] == 0){
+     tkn->r_type = tkn->r_type | RHS_D;
+     op_type = 1;
+  }
+  if(expression.types[expression.types_head - 2] == 0){
+     tkn->r_type = tkn->r_type | LHS_D;
+     op_type = 1;
+  }
+
+  expression.types_head--;
+  expression.types[expression.types_head - 1] = op_type;
 }

@@ -15,8 +15,8 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
    int stack_head = 0;
    while(op_index < runnable_len){
       const RToken *curr = &runnable[op_index];
-      printf("Token: %s\n", rtoken_str(curr));
-      switch(curr->r_type){
+      // printf("Token: %s\n", rtoken_str(curr));
+      switch(OP_MASK(curr->r_type)){
          case NUMBER:
             stack[stack_head++] = curr->as;
          break;
@@ -36,6 +36,7 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
          case MULT:
          case DIV:
          case MOD:
+            // printf("%s[%d,%d]\n", rtoken_str(curr), LHS_IS_DBL(curr->r_type), RHS_IS_DBL(curr->r_type));
             perform_shm_operation(curr->r_type, DBL, stack[stack_head - 1], &result);
             stack_head--;
          break;
@@ -87,7 +88,7 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
       return;
    }
    
-   switch(op){
+   switch(OP_MASK(op)){
       case GT:
          result->as.number = result->as.number > val.number;
       break;

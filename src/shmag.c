@@ -84,7 +84,7 @@ int main(int argc, char **argv){
          // print_im(tokens, num_tokens);
          if(build_runnable(tokens, num_tokens, runnable, &runnable_len) != -1){
             printf("Executable was built\n\n");
-            print_executable(argv[1], runnable, runnable_len);
+            // print_executable(argv[1], runnable, runnable_len);
             execute_runnable(&env, runnable, runnable_len);
          }else{
             printf("Unable to create an executable\n");

@@ -29,9 +29,17 @@ typedef enum {
    PUSH_SHM,
 } TokenType;
 
+#define OP_MASK(op) (op & 0xFFFF)
+#define RHS_D 0x010000
+#define LHS_D 0x020000
+
+#define LHS_IS_DBL(op) ((op & LHS_D) && 1)
+#define RHS_IS_DBL(op) ((op & RHS_D) && 1)
+
 typedef union {
    char *word;
    double number;
+   long decimal;
    int cond[2];
    void *data;
 } MultiVal;
