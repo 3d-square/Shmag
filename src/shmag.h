@@ -33,6 +33,9 @@ typedef enum {
 #define RHS_D 0x010000
 #define LHS_D 0x020000
 
+#define NUMBER_FLT 0x80000000
+#define NUMBER_IS_FLT(op) ((op & NUMBER_FLT) && 1)
+
 #define LHS_IS_DBL(op) ((op & LHS_D) && 1)
 #define RHS_IS_DBL(op) ((op & RHS_D) && 1)
 

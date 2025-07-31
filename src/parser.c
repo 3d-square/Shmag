@@ -54,13 +54,19 @@ void set_word_type(PToken *token){
       char *end;
       double dbl = strtod(token->as.word, &end);
       if(*end == '\0'){
-         free(token->as.word);
-         token->as.number = dbl;
+         int is_float = strchr(token->as.word, '.') != NULL;
          token->p_type = NUMBER;
+         free(token->as.word);
+         if(is_float){
+            token->as.number = dbl;
+            token->p_type = token->p_type | NUMBER_FLT;
+         }else{
+            token->as.decimal = (long)dbl;
+         }
       }
    }
 
-   if(token->p_type != WORD && token->p_type != NUMBER){
+   if(OP_MASK(token->p_type) != WORD && OP_MASK(token->p_type) != NUMBER){
       free(token->as.word);
    }
 }
@@ -134,7 +140,7 @@ void parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
 const char *ptoken_str(const PToken *ptoken){
    static char _buffer[512];
 
-   switch(ptoken->p_type){
+   switch(OP_MASK(ptoken->p_type)){
       case WORD:
          sprintf(_buffer, "Word[%d:%d](%s)", ptoken->line, ptoken->col, ptoken->as.word);
       break;

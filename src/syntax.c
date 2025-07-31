@@ -19,7 +19,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
    while(i < num_tokens){
       const PToken *curr_token = &tokens[i++];
 
-      switch(curr_token->p_type){
+      switch(OP_MASK(curr_token->p_type)){
          // Skip over WORD/VALUE
          case WORD:
          case NUMBER:
@@ -130,7 +130,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
 int expect_type(const PToken *tokens, int index, int types){
    if(types & E_OP){
-      switch(tokens[index].p_type){
+      switch(OP_MASK(tokens[index].p_type)){
          case GT:
          case EQ:
          case LT:
@@ -148,7 +148,7 @@ int expect_type(const PToken *tokens, int index, int types){
    }
 
    if(types & E_WORD){
-      switch(tokens[index].p_type){
+      switch(OP_MASK(tokens[index].p_type)){
          case WORD:
             return 1;
          break;
@@ -159,7 +159,7 @@ int expect_type(const PToken *tokens, int index, int types){
    }
 
    if(types & E_VALUE){
-      switch(tokens[index].p_type){
+      switch(OP_MASK(tokens[index].p_type)){
          case NUMBER:
             return 1;
          break;

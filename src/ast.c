@@ -9,7 +9,7 @@ RToken to_rtoken(PToken *tkn){
       .as.word = NULL
    };
 
-   if(tkn->p_type == WORD || tkn->p_type == NUMBER || tkn->p_type == SET_WORD){
+   if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER || tkn->p_type == SET_WORD){
       new_token.as = tkn->as;
    }
 
@@ -60,7 +60,7 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
    
    for(int i = 0; i < num_tokens; ++i){
       PToken *curr = &tokens[i];
-      switch(curr->p_type){
+      switch(OP_MASK(curr->p_type)){
          case WORD:
             // Check if the value is being set
             if(i + 1 < num_tokens && tokens[i + 1].p_type == SET){
@@ -219,12 +219,10 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
          exit(1);
       }
    }
-   if(tkn->p_type == WORD || tkn->p_type == NUMBER){
-      if(tkn->p_type == NUMBER){
-         expression.types[expression.types_head] = floor(tkn->as.number) == tkn->as.number;
-         if(expression.types[expression.types_head]){
-            // tkn->as.decimal = (long)tkn->as.number;
-         }
+
+   if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER){
+      if(OP_MASK(tkn->p_type) == NUMBER){
+         expression.types[expression.types_head] = NUMBER_IS_FLT(tkn->p_type);
       }else{
          expression.types[expression.types_head] = 0;
       }
@@ -237,6 +235,11 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
          runnable[*num_run_tokens] = (RToken){
             .r_type = INIT_SHM,
          };
+
+         if(expression.types[expression.types_head - 1]){
+            runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
+         }
+
          *num_run_tokens = *num_run_tokens + 1;
          expression.first_op = 1;
       }
@@ -361,12 +364,12 @@ void print_rtoken(const RToken *rtoken){
 
 void encode_operand(RToken *tkn){
    int op_type = 0;
-  // 0 means double, 1 means long
-  if(expression.types[expression.types_head - 1] == 0){
+  // 1 means double, 0 means long
+  if(expression.types[expression.types_head - 1] == 1){
      tkn->r_type = tkn->r_type | RHS_D;
      op_type = 1;
   }
-  if(expression.types[expression.types_head - 2] == 0){
+  if(expression.types[expression.types_head - 2] == 1){
      tkn->r_type = tkn->r_type | LHS_D;
      op_type = 1;
   }
