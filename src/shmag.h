@@ -39,6 +39,9 @@ typedef enum {
 #define LHS_IS_DBL(op) ((op & LHS_D) && 1)
 #define RHS_IS_DBL(op) ((op & RHS_D) && 1)
 
+#define WORD_DBL 0x80000000
+#define WORD_IS_DBL(op) ((op & WORD_DBL) && 1)
+
 typedef union {
    char *word;
    double number;
@@ -91,7 +94,7 @@ void parse_as_tokens(const char *, PToken *tokens, int *num_tokens);
 
 /* Interpreter Stages */
 int validate_syntax(PToken *tokens, int num_tokens);
-int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_run_tokens);
+int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens);
 int execute_runnable(REnv *env, RToken *runnable, int runnable_len);
 
 #define token_errorf(fmt, ...) _token_errorf(__FILE__, __func__, __LINE__, fmt, __VA_ARGS__)
@@ -103,13 +106,14 @@ const char *ptoken_str(const PToken *ptoken);
 void print_ptoken(const PToken *ptoken);
 const char *rtoken_str(const RToken *rtoken);
 void print_rtoken(const RToken *rtoken);
+const char *shmtype_str(ShmType type);
 
 /* Map Functions */
-void delete_rmap(RMap *map, char *key);
+void delete_rmap(RMap *map, const char *key);
 void insert_rmap(RMap *map, char *key, ShmType type, MultiVal value);
-ShmObj *search_rmap(RMap *map, char *key);
-RNode *node_search_rmap(RMap *map, char *key, int *hash);
-int hash_function(char *key);
+ShmObj *search_rmap(RMap *map, const char *key);
+RNode *node_search_rmap(RMap *map, const char *key, int *hash);
+int hash_function(const char *key);
 
 const char *shm_type_str(ShmType type);
 #endif

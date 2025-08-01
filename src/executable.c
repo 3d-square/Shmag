@@ -40,7 +40,8 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
             stack_head--;
          break;
          case SET_WORD:
-            insert_rmap(&env->variables, curr->as.word, DBL, stack[stack_head - 1]);
+            ShmType word_type = WORD_IS_DBL(curr->r_type) ? DBL : INT;
+            insert_rmap(&env->variables, curr->as.word, word_type, stack[stack_head - 1]);
             stack_head--;
          break;
          case WORD:

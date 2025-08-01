@@ -1,6 +1,7 @@
 #include <shmag.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 RToken to_rtoken(PToken *tkn){
@@ -46,13 +47,26 @@ static struct {
    int capacity;
    int line;
    int first_op;
+   ShmType type;
 } expression = {.types_head = 0, .capacity = 100, .size = 0, .line = -1, .first_op = 0};
 
-void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens);
+struct typed_word{
+   const char *word;
+   ShmType type;
+};
+static struct {
+   struct typed_word words[100];
+   int size;
+} registered_words;
+
+void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map);
 int expression_flush(RToken *runnable, int *num_run_tokens);
 void encode_operand(RToken *tkn);
+void register_word(const char *word, ShmType type, RMap *map);
+ShmType expression_type();
+ShmType is_word_registered(const char *word, RMap *map);
 
-int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_run_tokens){
+int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens){
    int op_index = 0;
    PToken *val_stack[1000];
    int stack_head = 0;
@@ -66,11 +80,11 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
             if(i + 1 < num_tokens && tokens[i + 1].p_type == SET){
                val_stack[stack_head++] = curr;
             }else{
-               expression_push(curr, runnable, &op_index);
+               expression_push(curr, runnable, &op_index, &env->variables);
             }
          break;
          case NUMBER:
-            expression_push(curr, runnable, &op_index);
+            expression_push(curr, runnable, &op_index, &env->variables);
          break;
          case DUMP:
             val_stack[stack_head++] = curr;
@@ -83,7 +97,7 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
          case MOD:
          case DIV:
          case MULT:
-            expression_push(curr, runnable, &op_index);
+            expression_push(curr, runnable, &op_index, &env->variables);
          break;
          case SET:
             curr->p_type = SET_WORD;
@@ -126,6 +140,11 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
             if((expr_line = expression_flush(runnable, &op_index)) != 0){
                if(val_stack[stack_head - 1]->p_type == SET_WORD){
                   runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
+                  // printf("Expression type = %s\n", shmtype_str(expression_type()));
+                  if(expression_type() == DBL){
+                     runnable[op_index - 1].r_type = runnable[op_index - 1].r_type | WORD_DBL;
+                  }
+                  register_word(runnable[op_index - 1].as.word, expression_type(), &env->variables);
                   stack_head--;
                }else if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[0] == -1){
                   runnable[op_index] = (RToken){
@@ -210,8 +229,9 @@ int build_runnable(PToken *tokens, int num_tokens, RToken *runnable, int *num_ru
    return 0;
 }
 
-void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
+void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map){
    if(expression.line == -1){
+      expression.type = INT;
       expression.line = tkn->line;
    }else{
       if(tkn->line != expression.line){
@@ -223,8 +243,22 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
    if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER){
       if(OP_MASK(tkn->p_type) == NUMBER){
          expression.types[expression.types_head] = NUMBER_IS_FLT(tkn->p_type);
+
+         if(NUMBER_IS_FLT(tkn->p_type)){
+            expression.type = DBL;
+         }
       }else{
-         expression.types[expression.types_head] = 0;
+         ShmType word_type = is_word_registered(tkn->as.word, map);
+         if(word_type == SHM_NULL){
+            fprintf(stderr, "'%s' has not been declared in this scope\n", tkn->as.word);
+            exit(1);
+         }
+
+         if(word_type == DBL){
+            expression.type = DBL;
+         }
+  
+         expression.types[expression.types_head] = word_type == DBL;
       }
 
       expression.types_head++;
@@ -253,6 +287,10 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens){
       }
       expression.stack[expression.size++] = tkn;
    }
+}
+
+ShmType expression_type(){
+   return expression.type;
 }
 
 int expression_flush(RToken *runnable, int *num_run_tokens){
@@ -362,6 +400,17 @@ void print_rtoken(const RToken *rtoken){
    printf("%s", rtoken_str(rtoken));
 }
 
+const char *shmtype_str(ShmType type){
+   switch(type){
+      case DBL: return "Double";
+      case INT: return "Decimal";
+      case STR: return "String";
+      case SHM_NULL: return "None";
+   }
+
+   return "SHM_Unknown";
+}
+
 void encode_operand(RToken *tkn){
    int op_type = 0;
   // 1 means double, 0 means long
@@ -376,4 +425,36 @@ void encode_operand(RToken *tkn){
 
   expression.types_head--;
   expression.types[expression.types_head - 1] = op_type;
+}
+
+void register_word(const char *word, ShmType type, RMap *map){
+   if(registered_words.size >= 100){
+      fprintf(stderr, "too many words registered\n");
+      exit(1);
+   }
+
+   if(is_word_registered(word, map) == SHM_NULL){
+      registered_words.words[registered_words.size++] = (struct typed_word){
+         .word = word,
+         .type = type
+      };
+   }
+}
+
+ShmType is_word_registered(const char *word, RMap *map){
+   ShmType result = SHM_NULL;
+   ShmObj *obj;
+
+   if((obj = search_rmap(map, word)) != NULL){
+      result = obj->obj_type;
+   }else{
+      for(int i = 0; i < registered_words.size; ++i){
+         if(strcmp(word, registered_words.words[i].word) == 0){
+            result = registered_words.words[i].type;
+            break;
+         }
+      }
+   }
+
+   return result;
 }

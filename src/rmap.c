@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int hash_function(char *key){
+int hash_function(const char *key){
    int sum    = 0,
        factor = 31;
 
@@ -16,7 +16,7 @@ int hash_function(char *key){
    return sum;
 }
 
-RNode *node_search_rmap(RMap *map, char *key, int *hash){
+RNode *node_search_rmap(RMap *map, const char *key, int *hash){
    int bucket = hash_function(key);
    *hash = bucket;
 
@@ -32,7 +32,7 @@ RNode *node_search_rmap(RMap *map, char *key, int *hash){
    return NULL;
 }
 
-ShmObj *search_rmap(RMap *map, char *key){
+ShmObj *search_rmap(RMap *map, const char *key){
    int hash;
    RNode *node = node_search_rmap(map, key, &hash);
 
@@ -71,7 +71,7 @@ void insert_rmap(RMap *map, char *key, ShmType type, MultiVal value){
    }
 }
 
-void delete_rmap(RMap *map, char *key){
+void delete_rmap(RMap *map, const char *key){
    int bucket = hash_function(key);
 
    RNode *prev = NULL;
