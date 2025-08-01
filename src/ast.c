@@ -171,6 +171,10 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                   runnable[op_index] = (RToken){
                      .r_type = DUMP,
                   };
+
+                  if(expression_type() == DBL){
+                     runnable[op_index].r_type = runnable[op_index].r_type | NUMBER_FLT;
+                  }
                   op_index++;
                   stack_head--;
                }
@@ -265,19 +269,19 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
       runnable[*num_run_tokens] = to_rtoken(tkn);
       *num_run_tokens = *num_run_tokens + 1;
    }else{
-      if(expression.first_op == 0){
-         runnable[*num_run_tokens] = (RToken){
-            .r_type = INIT_SHM,
-         };
-
-         if(expression.types[expression.types_head - 1]){
-            runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
-         }
-
-         *num_run_tokens = *num_run_tokens + 1;
-         expression.first_op = 1;
-      }
       while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
+         if(expression.first_op == 0){
+            runnable[*num_run_tokens] = (RToken){
+               .r_type = INIT_SHM,
+            };
+
+            if(expression.types[expression.types_head - 1]){
+               runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
+            }
+
+            *num_run_tokens = *num_run_tokens + 1;
+            expression.first_op = 1;
+         }
          runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
 
          encode_operand(&runnable[*num_run_tokens]);
@@ -303,6 +307,18 @@ int expression_flush(RToken *runnable, int *num_run_tokens){
    expression.first_op = 0;
    expression.line = -1;
    while(expression.size > 0){
+      if(expression.first_op == 0){
+         runnable[*num_run_tokens] = (RToken){
+            .r_type = INIT_SHM,
+         };
+
+         if(expression.types[expression.types_head - 1]){
+            runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
+         }
+
+         *num_run_tokens = *num_run_tokens + 1;
+         expression.first_op = 1;
+      }
       runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
       encode_operand(&runnable[*num_run_tokens]);
 
@@ -398,17 +414,6 @@ const char *rtoken_str(const RToken *rtoken){
 
 void print_rtoken(const RToken *rtoken){
    printf("%s", rtoken_str(rtoken));
-}
-
-const char *shmtype_str(ShmType type){
-   switch(type){
-      case DBL: return "Double";
-      case INT: return "Decimal";
-      case STR: return "String";
-      case SHM_NULL: return "None";
-   }
-
-   return "SHM_Unknown";
 }
 
 void encode_operand(RToken *tkn){

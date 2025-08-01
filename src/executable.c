@@ -19,9 +19,11 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
       switch(OP_MASK(curr->r_type)){
          case NUMBER:
             stack[stack_head++] = curr->as;
+            // printf("[%f][%ld]\n", curr->as.number, curr->as.decimal);
          break;
          case INIT_SHM:
             perform_shm_operation(curr->r_type, SHM_NULL, stack[stack_head - 1], &result);
+            // printf("init [%f][%ld]\n", stack[stack_head - 1].number, stack[stack_head - 1].decimal);
             stack_head--;
          break;
          case PUSH_SHM:
@@ -36,6 +38,7 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
          case MULT:
          case DIV:
          case MOD:
+            // printf("%s\n", rtoken_str(curr));
             perform_shm_operation(curr->r_type, DBL, stack[stack_head - 1], &result);
             stack_head--;
          break;
@@ -57,7 +60,12 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
             op_index = curr->as.cond[0];
          break;
          case DUMP:
-            printf("%f(%ld)\n", stack[stack_head - 1].number, stack[stack_head - 1].decimal);
+            // 
+            if(NUMBER_IS_FLT(curr->r_type)){
+               printf("%f\n", stack[stack_head - 1].number);
+            }else{
+               printf("%ld\n", stack[stack_head - 1].decimal);
+            }
             --stack_head;
          break;
          case IF:
@@ -89,29 +97,31 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
       result->as = val;
       return;
    }
+   // printf("lhs [%f][%ld]\n", val.number, val.decimal);
+   // printf("rhs [%f][%ld]\n", result->as.number, result->as.decimal);
 
    if(LHS_IS_DBL(op) && RHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.number = result->as.number > val.number;
-         break;                                     
-         case LT:                                   
-            result->as.number = result->as.number < val.number;
-         break;                                     
-         case EQ:                                   
-            result->as.number = result->as.number == val.number;
-         break;                                     
-         case PLUS:                                 
-            result->as.number = result->as.number + val.number;
-         break;                                     
-         case MINUS:                                
-            result->as.number = result->as.number - val.number;
-         break;                                     
-         case MULT:                                 
-            result->as.number = result->as.number * val.number;
-         break;                                     
-         case DIV:                                  
-            result->as.number = result->as.number / val.number;
+            result->as.number = val.number > result->as.number;
+         break;                                               
+         case LT:                                             
+            result->as.number = val.number < result->as.number;
+         break;                                               
+         case EQ:                                             
+            result->as.number = val.number == result->as.number;
+         break;                                               
+         case PLUS:                                           
+            result->as.number = val.number + result->as.number;
+         break;                                               
+         case MINUS:                                          
+            result->as.number = val.number - result->as.number;
+         break;                                               
+         case MULT:                                           
+            result->as.number = val.number * result->as.number;
+         break;                                               
+         case DIV:                                            
+            result->as.number = val.number / result->as.number;
          break;
          case MOD:
             fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
@@ -121,29 +131,28 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
             fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
-      printf("DBL DBL: %f\n", result->as.number);
    }else if(LHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.number = result->as.number > val.decimal;
+            result->as.number = val.decimal > result->as.number;
          break;                                                
          case LT:                                              
-            result->as.number = result->as.number < val.decimal;
+            result->as.number = val.decimal < result->as.number;
          break;                                                
          case EQ:                                              
-            result->as.number = result->as.number == val.decimal;
+            result->as.number = val.decimal == result->as.number;
          break;                                                
          case PLUS:                                            
-            result->as.number = result->as.number + val.decimal;
+            result->as.number = val.decimal + result->as.number;
          break;                                                
          case MINUS:                                           
-            result->as.number = result->as.number - val.decimal;
+            result->as.number = val.decimal - result->as.number;
          break;                                                
          case MULT:                                            
-            result->as.number = result->as.number * val.decimal;
+            result->as.number = val.decimal * result->as.number;
          break;                                                
          case DIV:                                             
-            result->as.number = result->as.number / val.decimal;
+            result->as.number = val.decimal / result->as.number;
          break;
          case MOD:
             fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
@@ -153,29 +162,28 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
             fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
-      printf("DBL LNG: %f\n", result->as.number);
    }else if(RHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.number = result->as.decimal > val.number;
-         break;
-         case LT:
-            result->as.number = result->as.decimal < val.number;
-         break;
-         case EQ:
-            result->as.number = result->as.decimal = val.number;
-         break;
-         case PLUS:
-            result->as.number = result->as.decimal + val.number;
-         break;
-         case MINUS:
-            result->as.number = result->as.decimal - val.number;
-         break;
-         case MULT:
-            result->as.number = result->as.decimal * val.number;
-         break;
-         case DIV:
-            result->as.number = result->as.decimal / val.number;
+            result->as.number = val.number > result->as.decimal;
+         break;                              
+         case LT:                            
+            result->as.number = val.number < result->as.decimal;
+         break;                              
+         case EQ:                            
+            result->as.number = val.number == result->as.decimal;
+         break;                              
+         case PLUS:                          
+            result->as.number = val.number + result->as.decimal;
+         break;                              
+         case MINUS:                         
+            result->as.number = val.number - result->as.decimal;
+         break;                              
+         case MULT:                          
+            result->as.number = val.number * result->as.decimal;
+         break;                              
+         case DIV:                           
+            result->as.number = val.number / result->as.decimal;
          break;
          case MOD:
             fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
@@ -185,29 +193,28 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
             fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
-      printf("LNG DBL: %f\n", result->as.number);
    }else{
       switch(OP_MASK(op)){
          case GT:
-            result->as.decimal = result->as.decimal > val.decimal;
-         break;                                       
-         case LT:                                     
-            result->as.decimal = result->as.decimal < val.decimal;
-         break;                                       
-         case EQ:                                     
-            result->as.decimal = result->as.decimal == val.decimal;
-         break;                                       
-         case PLUS:                                   
-            result->as.decimal = result->as.decimal + val.decimal;
-         break;                                       
-         case MINUS:                                  
-            result->as.decimal = result->as.decimal - val.decimal;
-         break;                                       
-         case MULT:                                   
-            result->as.decimal = result->as.decimal * val.decimal;
-         break;                                       
-         case DIV:                                    
-            result->as.decimal = result->as.decimal / val.decimal;
+            result->as.decimal = val.decimal > result->as.decimal;
+         break;                                                  
+         case LT:                                                
+            result->as.decimal = val.decimal < result->as.decimal;
+         break;                                                  
+         case EQ:                                                
+            result->as.decimal = val.decimal == result->as.decimal;
+         break;                                                  
+         case PLUS:                                              
+            result->as.decimal = val.decimal + result->as.decimal;
+         break;                                                  
+         case MINUS:                                             
+            result->as.decimal = val.decimal - result->as.decimal;
+         break;                                                  
+         case MULT:                                              
+            result->as.decimal = val.decimal * result->as.decimal;
+         break;                                                  
+         case DIV:                                               
+            result->as.decimal = val.decimal / result->as.decimal;
          break;
          case MOD:
             fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
@@ -217,6 +224,5 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
             fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
-      printf("LNG LNG: %ld\n", result->as.decimal);
    }
 }

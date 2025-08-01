@@ -106,7 +106,7 @@ const char *ptoken_str(const PToken *ptoken);
 void print_ptoken(const PToken *ptoken);
 const char *rtoken_str(const RToken *rtoken);
 void print_rtoken(const RToken *rtoken);
-const char *shmtype_str(ShmType type);
+const char *shm_type_str(ShmType type);
 
 /* Map Functions */
 void delete_rmap(RMap *map, const char *key);
@@ -115,5 +115,4 @@ ShmObj *search_rmap(RMap *map, const char *key);
 RNode *node_search_rmap(RMap *map, const char *key, int *hash);
 int hash_function(const char *key);
 
-const char *shm_type_str(ShmType type);
 #endif
