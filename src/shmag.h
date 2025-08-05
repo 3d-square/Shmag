@@ -7,16 +7,19 @@ typedef enum {
    LINE_SEP,
    SET_WORD,
    WORD,
-   // WORD_LIT,
    NUMBER,
    PLUS,
    MOD,
    MINUS,
    MULT,
+   PAREN_OPEN,
+   PAREN_CLOSE,
    DIV,
+
    EQ,
    GT,
    LT,
+
    IF,
    ELSE,
    END,
@@ -27,6 +30,10 @@ typedef enum {
    SET,
    INIT_SHM,
    PUSH_SHM,
+   FUNC,
+   CALL,
+   PROTO_FUNC,
+   EXPR_SEP,
 } TokenType;
 
 #define OP_MASK(op) (op & 0xFFFF)
@@ -42,18 +49,22 @@ typedef enum {
 #define WORD_DBL 0x80000000
 #define WORD_IS_DBL(op) ((op & WORD_DBL) && 1)
 
+typedef struct _shm_func ShmFunc;
+
 typedef union {
    char *word;
    double number;
    long decimal;
    int cond[2];
    void *data;
+   ShmFunc *func;
 } MultiVal;
 
 typedef enum {
-   DBL,
-   INT,
-   STR,
+   SHM_DBL,
+   SHM_INT,
+   SHM_STR,
+   SHM_FUNC,
    SHM_NULL,
 } ShmType;
 
@@ -74,6 +85,13 @@ typedef struct {
    MultiVal as;  
 } RToken;
 
+typedef struct  _shm_func{
+   int num_args;
+   const char **args;
+   RToken *tokens;
+   int num_tokens;
+} ShmFunc;
+
 typedef struct node {
    char *key;
    ShmObj obj;
@@ -86,8 +104,20 @@ typedef struct hashMap{
    RNode *arr[MAX_BUCKETS];
 } RMap;
 
+typedef struct v_node {
+   char *key;
+   void *data;
+   struct v_node *next;
+} VNode;
+
+typedef struct v_hashMap{
+   int num_elems;
+   VNode *arr[MAX_BUCKETS];
+} VMap;
+
 typedef struct {
    RMap variables;
+   RMap funcs;
 } REnv;
 
 void parse_as_tokens(const char *, PToken *tokens, int *num_tokens);
@@ -110,9 +140,14 @@ const char *shm_type_str(ShmType type);
 
 /* Map Functions */
 void delete_rmap(RMap *map, const char *key);
-void insert_rmap(RMap *map, char *key, ShmType type, MultiVal value);
+void insert_rmap(RMap *map, const char *key, ShmType type, MultiVal value);
 ShmObj *search_rmap(RMap *map, const char *key);
 RNode *node_search_rmap(RMap *map, const char *key, int *hash);
 int hash_function(const char *key);
+
+void delete_vmap(VMap *map, const char *key);
+void insert_vmap(VMap *map, const char *key, void *value);
+void *search_vmap(VMap *map, const char *key);
+VNode *node_search_vmap(VMap *map, const char *key, int *hash);
 
 #endif

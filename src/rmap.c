@@ -43,7 +43,7 @@ ShmObj *search_rmap(RMap *map, const char *key){
    return NULL;
 }
 
-void insert_rmap(RMap *map, char *key, ShmType type, MultiVal value){
+void insert_rmap(RMap *map, const char *key, ShmType type, MultiVal value){
    int bucket;
    RNode *node = node_search_rmap(map, key, &bucket);
 
@@ -57,7 +57,7 @@ void insert_rmap(RMap *map, char *key, ShmType type, MultiVal value){
       node->obj.as = value;
    }else{
       node = malloc(sizeof(RNode));
-      node->key = key;
+      node->key = strdup(key);
       node->obj.obj_type = type;
       node->obj.as = value;
       node->next = NULL;
@@ -96,12 +96,14 @@ void delete_rmap(RMap *map, const char *key){
 
 const char *shm_type_str(ShmType type){
    switch(type){
-      case INT:
+      case SHM_INT:
          return "Integer";
-      case DBL:
+      case SHM_DBL:
          return "Float";
-      case STR:
+      case SHM_STR:
          return "String";
+      case SHM_FUNC:
+         return "Function";
       case SHM_NULL:
          return "None";
    }

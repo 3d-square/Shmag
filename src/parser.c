@@ -13,6 +13,10 @@ const char *skip_whitespace(const char *line){
    return tmp;
 }
 
+int is_seperator(char c){
+   return strchr("_+-=:<>?,./!@#$%^&*() \n\t\r", c) != NULL;
+}
+
 int has_next_token(const char *line){
    const char *next = skip_whitespace(line);
    return *next && *next != '\n';
@@ -28,6 +32,10 @@ void set_word_type(PToken *token){
       token->p_type = LT;
    }else if(strcmp(token->as.word, ":=") == 0){
       token->p_type = SET;
+   }else if(strcmp(token->as.word, ")") == 0){
+      token->p_type = PAREN_CLOSE;
+   }else if(strcmp(token->as.word, "(") == 0){
+      token->p_type = PAREN_OPEN;
    }else if(strcmp(token->as.word, "+") == 0){
       token->p_type = PLUS;
    }else if(strcmp(token->as.word, "-") == 0){
@@ -50,6 +58,12 @@ void set_word_type(PToken *token){
       token->p_type = ELIF;
    }else if(strcmp(token->as.word, "while") == 0){
       token->p_type = WHILE;
+   }else if(strcmp(token->as.word, "func") == 0){
+      token->p_type = FUNC;
+   }else if(strcmp(token->as.word, "proto") == 0){
+      token->p_type = PROTO_FUNC;
+   }else if(strcmp(token->as.word, ",") == 0){
+      token->p_type = EXPR_SEP;
    }else{
       char *end;
       double dbl = strtod(token->as.word, &end);
@@ -71,6 +85,25 @@ void set_word_type(PToken *token){
    }
 }
 
+int is_token(const char *str){
+   if(strncmp(str, ":=", 2) == 0) return 2;
+   if(strncmp(str, "==", 2) == 0) return 2;
+
+   if(strncmp(str, ">", 1) == 0) return 1;
+   if(strncmp(str, "(", 1) == 0) return 1;
+   if(strncmp(str, ")", 1) == 0) return 1;
+   if(strncmp(str, "<", 1) == 0) return 1;
+   if(strncmp(str, "*", 1) == 0) return 1;
+   if(strncmp(str, "/", 1) == 0) return 1;
+   if(strncmp(str, "%", 1) == 0) return 1;
+   if(strncmp(str, ",", 1) == 0) return 1;
+   if(strncmp(str, "<", 1) == 0) return 1;
+   if(strncmp(str, ".", 1) == 0) return 1;
+   if(strncmp(str, "-", 1) == 0 && !isdigit(str[1])) return 1;
+   if(strncmp(str, "+", 1) == 0 && !isdigit(str[1])) return 1;
+   return 0;
+}
+
 PToken next_token(const char *line, int curr_line, int *curr_col){
 
    line = line + *curr_col;
@@ -83,9 +116,13 @@ PToken next_token(const char *line, int curr_line, int *curr_col){
    *curr_col = *curr_col + token_start - line;
 
    new_token.col = *curr_col  + 1;// add once for 0 index
-   // Loop through token types and make them, currently everything is seperated by spaces
-   while(token_start[token_len] && !isspace(token_start[token_len])){
-      token_len += 1;
+
+   if((token_len = is_token(token_start)) == 0){
+      // Loop through token types and make them, currently everything is seperated by spaces
+      token_len = 1;
+      while(token_start[token_len] && !is_seperator(token_start[token_len])){
+         token_len += 1;
+      }
    }
 
    // Allocate memory and copy the new token into it
@@ -172,22 +209,37 @@ const char *ptoken_str(const PToken *ptoken){
          sprintf(_buffer, "Divide[%d:%d]", ptoken->line, ptoken->col);
       break;
       case DUMP:
-         sprintf(_buffer, "Dump");
+         sprintf(_buffer, "Dump[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case FUNC:
+         sprintf(_buffer, "Function[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case PROTO_FUNC:
+         sprintf(_buffer, "Prototype[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case EXPR_SEP:
+         sprintf(_buffer, "Expr Sep[%d:%d]", ptoken->line, ptoken->col);
       break;
       case IF:
-         sprintf(_buffer, "If");
+         sprintf(_buffer, "If[%d:%d]", ptoken->line, ptoken->col);
       break;
       case ELSE:
-         sprintf(_buffer, "Else");
+         sprintf(_buffer, "Else[%d:%d]", ptoken->line, ptoken->col);
       break;
       case ELIF:
-         sprintf(_buffer, "Elif");
+         sprintf(_buffer, "Elif[%d:%d]", ptoken->line, ptoken->col);
       break;
       case END:
-         sprintf(_buffer, "End");
+         sprintf(_buffer, "End[%d:%d]", ptoken->line, ptoken->col);
       break;
       case MOD:
-         sprintf(_buffer, "Mod");
+         sprintf(_buffer, "Mod[%d:%d]", ptoken->line, ptoken->col);
+      break;
+      case PAREN_OPEN:
+         sprintf(_buffer, "'('[%d:%d]",  ptoken->line, ptoken->col);
+      break;
+      case PAREN_CLOSE:
+         sprintf(_buffer, "')'[%d:%d]",  ptoken->line, ptoken->col);
       break;
       case LINE_SEP:
          sprintf(_buffer, "line_sep");
@@ -196,7 +248,7 @@ const char *ptoken_str(const PToken *ptoken){
          sprintf(_buffer, "goto");
       break;
       case WHILE:
-         sprintf(_buffer, "While");
+         sprintf(_buffer, "While[%d:%d]", ptoken->line, ptoken->col);
       break;
       case SET_WORD:
          sprintf(_buffer, "SetWord(%s)", ptoken->as.word);

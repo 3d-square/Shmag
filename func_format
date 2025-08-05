@@ -1,0 +1,11 @@
+This is the format expected for a function
+
+# Proto type
+   - proto func_name(arg1 , arg2 , ...)
+# Definition
+   - func func_name(arg1 , arg2 , ...)
+   -  ...
+   - end
+
+# Call
+   - func_name(arg1 , arg2 , arg3 ...)

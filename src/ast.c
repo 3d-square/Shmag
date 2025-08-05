@@ -63,6 +63,8 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
 int expression_flush(RToken *runnable, int *num_run_tokens);
 void encode_operand(RToken *tkn);
 void register_word(const char *word, ShmType type, RMap *map);
+void check_init_shm(RToken *runnable, int *num_run_tokens);
+int parse_function_header(REnv *env, PToken *tokens, int start);
 ShmType expression_type();
 ShmType is_word_registered(const char *word, RMap *map);
 
@@ -81,6 +83,11 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                val_stack[stack_head++] = curr;
             }else{
                expression_push(curr, runnable, &op_index, &env->variables);
+            }
+         break;
+         case PROTO_FUNC:
+            if(parse_function_header(env, tokens, i)){
+               return 1;
             }
          break;
          case NUMBER:
@@ -141,7 +148,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                if(val_stack[stack_head - 1]->p_type == SET_WORD){
                   runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                   // printf("Expression type = %s\n", shmtype_str(expression_type()));
-                  if(expression_type() == DBL){
+                  if(expression_type() == SHM_DBL){
                      runnable[op_index - 1].r_type = runnable[op_index - 1].r_type | WORD_DBL;
                   }
                   register_word(runnable[op_index - 1].as.word, expression_type(), &env->variables);
@@ -172,7 +179,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                      .r_type = DUMP,
                   };
 
-                  if(expression_type() == DBL){
+                  if(expression_type() == SHM_DBL){
                      runnable[op_index].r_type = runnable[op_index].r_type | NUMBER_FLT;
                   }
                   op_index++;
@@ -235,7 +242,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
 
 void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map){
    if(expression.line == -1){
-      expression.type = INT;
+      expression.type = SHM_INT;
       expression.line = tkn->line;
    }else{
       if(tkn->line != expression.line){
@@ -247,10 +254,6 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
    if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER){
       if(OP_MASK(tkn->p_type) == NUMBER){
          expression.types[expression.types_head] = NUMBER_IS_FLT(tkn->p_type);
-
-         if(NUMBER_IS_FLT(tkn->p_type)){
-            expression.type = DBL;
-         }
       }else{
          ShmType word_type = is_word_registered(tkn->as.word, map);
          if(word_type == SHM_NULL){
@@ -258,11 +261,11 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
             exit(1);
          }
 
-         if(word_type == DBL){
-            expression.type = DBL;
+         if(word_type == SHM_DBL){
+            expression.type = SHM_DBL;
          }
   
-         expression.types[expression.types_head] = word_type == DBL;
+         expression.types[expression.types_head] = word_type == SHM_DBL;
       }
 
       expression.types_head++;
@@ -270,18 +273,8 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
       *num_run_tokens = *num_run_tokens + 1;
    }else{
       while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
-         if(expression.first_op == 0){
-            runnable[*num_run_tokens] = (RToken){
-               .r_type = INIT_SHM,
-            };
-
-            if(expression.types[expression.types_head - 1]){
-               runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
-            }
-
-            *num_run_tokens = *num_run_tokens + 1;
-            expression.first_op = 1;
-         }
+         check_init_shm(runnable, num_run_tokens);
+         
          runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
 
          encode_operand(&runnable[*num_run_tokens]);
@@ -293,46 +286,54 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
    }
 }
 
+void check_init_shm(RToken *runnable, int *num_run_tokens){
+   if(expression.first_op == 0){
+      runnable[*num_run_tokens] = (RToken){
+         .r_type = INIT_SHM,
+      };
+
+      if(expression.types[expression.types_head - 1]){
+         runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
+      }
+
+      *num_run_tokens = *num_run_tokens + 1;
+      expression.first_op = 1;
+   }
+}
+
 ShmType expression_type(){
    return expression.type;
 }
 
 int expression_flush(RToken *runnable, int *num_run_tokens){
    int tmp = expression.line;
-   int tmp2 = expression.first_op;
    if(expression.line == -1){
       return 0;
    }
 
-   expression.first_op = 0;
    expression.line = -1;
    while(expression.size > 0){
-      if(expression.first_op == 0){
-         runnable[*num_run_tokens] = (RToken){
-            .r_type = INIT_SHM,
-         };
-
-         if(expression.types[expression.types_head - 1]){
-            runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
-         }
-
-         *num_run_tokens = *num_run_tokens + 1;
-         expression.first_op = 1;
-      }
+      check_init_shm(runnable, num_run_tokens);
+      
       runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
       encode_operand(&runnable[*num_run_tokens]);
 
       *num_run_tokens = *num_run_tokens + 1;
       expression.size -= 1;
    }
-   if(tmp2 == 1){
+   if(expression.first_op == 1){
       runnable[*num_run_tokens] = (RToken){
          .r_type = PUSH_SHM,
       };
       *num_run_tokens = *num_run_tokens + 1;
    }
 
+   if(expression.types_head > 0){
+      expression.type = expression.types[expression.types_head - 1] ? SHM_DBL : SHM_INT;
+   }
+
    expression.types_head = 0;
+   expression.first_op = 0;
 
    return tmp;
 }
@@ -418,18 +419,23 @@ void print_rtoken(const RToken *rtoken){
 
 void encode_operand(RToken *tkn){
    int op_type = 0;
-  // 1 means double, 0 means long
-  if(expression.types[expression.types_head - 1] == 1){
-     tkn->r_type = tkn->r_type | RHS_D;
-     op_type = 1;
-  }
-  if(expression.types[expression.types_head - 2] == 1){
-     tkn->r_type = tkn->r_type | LHS_D;
-     op_type = 1;
-  }
+   TokenType orig_type = tkn->r_type;
+   // 1 means double, 0 means long
+   if(expression.types[expression.types_head - 1] == 1){
+      tkn->r_type = tkn->r_type | RHS_D;
+      op_type = 1;
+   }
+   if(expression.types[expression.types_head - 2] == 1){
+      tkn->r_type = tkn->r_type | LHS_D;
+      op_type = 1;
+   }
 
-  expression.types_head--;
-  expression.types[expression.types_head - 1] = op_type;
+   if(orig_type == GT || orig_type == LT || orig_type == EQ){
+      op_type = 0;
+   }
+
+   expression.types_head--;
+   expression.types[expression.types_head - 1] = op_type;
 }
 
 void register_word(const char *word, ShmType type, RMap *map){
@@ -462,4 +468,60 @@ ShmType is_word_registered(const char *word, RMap *map){
    }
 
    return result;
+}
+
+int parse_function_header(REnv *env, PToken *tokens, int start){
+   int is_proto = tokens[start].p_type == PROTO_FUNC;
+
+   if(search_rmap(&env->variables, tokens[start + 1].as.word)){
+      token_errorf("Cannot be used as both a variable and a function", &tokens[start + 1]);
+      return 1;
+   }
+
+   ShmObj *func_wrapper = search_rmap(&env->funcs, tokens[start + 1].as.word);
+   int found = func_wrapper != NULL;
+   ShmFunc *function;
+
+   // get number of args
+   int num_args = tokens[start + 2].p_type == LINE_SEP ? 0 : 1;
+   int offset = 2;
+   int i = 0;
+   while(tokens[start + offset].p_type != LINE_SEP){
+      num_args++;
+      offset += 2;
+   }
+
+   if(found){
+      // check if the number of args are the same
+      function = func_wrapper->as.func;
+      if(function->num_args != num_args){
+         token_errorf("Found duplicate function header that does not have the same number of args as the original", &tokens[i + 1]);
+         return 1;
+      }
+
+      if(!is_proto){
+         if(function->args){
+            token_errorf("Double initialization of function %s", &tokens[start], tokens[start + 1].as.word);
+            return 1;
+         }
+
+         function->args = calloc(sizeof(char *), num_args);
+         while(i < num_args){
+            function->args[i] = strdup(tokens[start + (i * 2) + 2].as.word);
+         }
+      }
+   }else{
+      function = calloc(1, sizeof(ShmFunc));
+      function->num_args = num_args;
+      if(!is_proto){
+         while(i < num_args){
+            function->args[i] = strdup(tokens[start + (i * 2) + 2].as.word);
+         }
+
+         function->num_tokens = start;
+      }
+      insert_rmap(&env->funcs, tokens[start + 1].as.word, SHM_FUNC, (MultiVal){.func = function});
+   }
+
+   return 0;
 }

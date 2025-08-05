@@ -7,11 +7,17 @@ int is_truthy(MultiVal val);
 
 void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *result);
 
+int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_len);
+
 int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
-   int op_index = 0;
    MultiVal stack[1000];
+   return execute_tokens(env, stack, runnable, runnable_len);
+}
+
+int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_len){
    ShmObj *obj_ptr;
    ShmObj result;
+   int op_index = 0;
    int stack_head = 0;
    while(op_index < runnable_len){
       const RToken *curr = &runnable[op_index];
@@ -19,11 +25,9 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
       switch(OP_MASK(curr->r_type)){
          case NUMBER:
             stack[stack_head++] = curr->as;
-            // printf("[%f][%ld]\n", curr->as.number, curr->as.decimal);
          break;
          case INIT_SHM:
             perform_shm_operation(curr->r_type, SHM_NULL, stack[stack_head - 1], &result);
-            // printf("init [%f][%ld]\n", stack[stack_head - 1].number, stack[stack_head - 1].decimal);
             stack_head--;
          break;
          case PUSH_SHM:
@@ -39,11 +43,11 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
          case DIV:
          case MOD:
             // printf("%s\n", rtoken_str(curr));
-            perform_shm_operation(curr->r_type, DBL, stack[stack_head - 1], &result);
+            perform_shm_operation(curr->r_type, SHM_DBL, stack[stack_head - 1], &result);
             stack_head--;
          break;
          case SET_WORD:
-            ShmType word_type = WORD_IS_DBL(curr->r_type) ? DBL : INT;
+            ShmType word_type = WORD_IS_DBL(curr->r_type) ? SHM_DBL : SHM_INT;
             insert_rmap(&env->variables, curr->as.word, word_type, stack[stack_head - 1]);
             stack_head--;
          break;
@@ -77,7 +81,7 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
          break;
          default:
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));
-         return 1;
+            return 1;
       }
       // printf("op_index = %d\n", op_index);
       op_index++;
@@ -88,7 +92,7 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
 
 
 int is_truthy(MultiVal val){
-   return (int)val.number != 0;
+   return (int)val.decimal != 0;
 }
 
 /* result is rhs */
@@ -97,19 +101,17 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
       result->as = val;
       return;
    }
-   // printf("lhs [%f][%ld]\n", val.number, val.decimal);
-   // printf("rhs [%f][%ld]\n", result->as.number, result->as.decimal);
 
    if(LHS_IS_DBL(op) && RHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.number = val.number > result->as.number;
+            result->as.decimal = val.number > result->as.number;
          break;                                               
          case LT:                                             
-            result->as.number = val.number < result->as.number;
+            result->as.decimal = val.number < result->as.number;
          break;                                               
          case EQ:                                             
-            result->as.number = val.number == result->as.number;
+            result->as.decimal = val.number == result->as.number;
          break;                                               
          case PLUS:                                           
             result->as.number = val.number + result->as.number;
@@ -134,13 +136,13 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
    }else if(LHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.number = val.decimal > result->as.number;
-         break;                                                
-         case LT:                                              
-            result->as.number = val.decimal < result->as.number;
-         break;                                                
-         case EQ:                                              
-            result->as.number = val.decimal == result->as.number;
+            result->as.decimal = val.decimal > result->as.number;
+         break;                                          
+         case LT:                                        
+            result->as.decimal = val.decimal < result->as.number;
+         break;                                          
+         case EQ:                                        
+            result->as.decimal = val.decimal == result->as.number;
          break;                                                
          case PLUS:                                            
             result->as.number = val.decimal + result->as.number;
@@ -165,13 +167,13 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
    }else if(RHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.number = val.number > result->as.decimal;
+            result->as.decimal = val.number > result->as.decimal;
          break;                              
          case LT:                            
-            result->as.number = val.number < result->as.decimal;
+            result->as.decimal = val.number < result->as.decimal;
          break;                              
          case EQ:                            
-            result->as.number = val.number == result->as.decimal;
+            result->as.decimal = val.number == result->as.decimal;
          break;                              
          case PLUS:                          
             result->as.number = val.number + result->as.decimal;
@@ -190,7 +192,6 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
             exit(1);
          break;
          default:
-            fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
    }else{
@@ -217,8 +218,7 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
             result->as.decimal = val.decimal / result->as.decimal;
          break;
          case MOD:
-            fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
-            exit(1);
+            result->as.decimal = val.decimal % result->as.decimal;
          break;
          default:
             fprintf(stderr, "Invalid Operand\n");
