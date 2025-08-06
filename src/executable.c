@@ -14,6 +14,24 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
    return execute_tokens(env, stack, runnable, runnable_len);
 }
 
+int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head){
+   // Push Arguments to the variables
+   for(int i = 0; i < func->num_args; ++i){
+      insert_rmap(&env->variables, func->args[i], SHM_INT, stack[*stack_head + i - func->num_args]);
+   }
+   // Call function
+   print_executable("function", func->tokens, func->num_tokens);
+   int status = execute_tokens(env, stack + *stack_head, func->tokens, func->num_tokens);
+
+   // Pop args on the stack
+   for(int i = 0; i < func->num_args; ++i){
+      delete_rmap(&env->variables, func->args[i]);
+   }
+   *stack_head = *stack_head - func->num_args;
+
+   return status;
+}
+
 int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_len){
    ShmObj *obj_ptr;
    ShmObj result;
@@ -78,6 +96,12 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
                op_index = curr->as.cond[0];
             }
             stack_head--;
+         break;
+         case CALL:
+            ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
+            printf("Calling %s, with %d args\n", curr->as.word, func_info->num_args);
+            execute_function(env, func_info, stack, &stack_head);
+            return 1;
          break;
          default:
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));

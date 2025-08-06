@@ -85,6 +85,7 @@ void delete_rmap(RMap *map, const char *key){
             prev->next = curr->next;
          }
 
+         free(curr->key);
          free(curr);
          break;
       }

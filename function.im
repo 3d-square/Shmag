@@ -1,0 +1,8 @@
+0: Number(0.000000)(1)
+1: SetWord(i)
+2: Number(0.000000)(2)
+3: SetWord(j)
+4: InitShm
+5: Plus
+6: PushShm
+7: Dump

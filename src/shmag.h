@@ -139,6 +139,7 @@ void print_ptoken(const PToken *ptoken);
 const char *rtoken_str(const RToken *rtoken);
 void print_rtoken(const RToken *rtoken);
 const char *shm_type_str(ShmType type);
+void print_executable(const char *name, RToken *exe, int len);
 
 /* Map Functions */
 void delete_rmap(RMap *map, const char *key);

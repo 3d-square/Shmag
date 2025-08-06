@@ -10,7 +10,7 @@ RToken to_rtoken(PToken *tkn){
       .as.word = NULL
    };
 
-   if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER || tkn->p_type == SET_WORD){
+   if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER || tkn->p_type == SET_WORD || tkn->p_type == CALL){
       new_token.as = tkn->as;
    }
 
@@ -208,10 +208,43 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          case CALL:
             printf("Calling function %s\n", curr->as.word);
             // Verify number of arguments
+            int size = 0;
+            ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
+            if(tokens[i + 2].p_type != PAREN_CLOSE){
+               int j = i + 2;
+               size = 1;
+               while(tokens[j].p_type != PAREN_CLOSE){
+                  if(tokens[j].p_type == EXPR_SEP) size++;
+                  j++;
+               }
+            }
+
+            if(size != func_info->num_args){
+               token_errorf("Argument missmatch. Expected %d. Actual %d", curr, func_info->num_args, size);
+               return -1;
+            }
             // push function to stack
+            val_stack[stack_head++] = curr;
+         break;
+         case EXPR_SEP:
             // if , is seen flush the expression
+            expression_flush(runnable, &op_index);
+         break;
+         case PAREN_OPEN:
+         break;
+         case PAREN_CLOSE:
             // once ) is reached pop function from stack
-            return -1;
+            if(val_stack[stack_head - 1]->p_type == CALL){
+               if(search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func->num_args > 0){
+                  expression_flush(runnable, &op_index);
+               }
+               runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
+               stack_head--;
+               
+            }else{
+               token_errorf("Paren Close is not supported for non CALL type", val_stack[stack_head - 1]);
+            }
+
          break;
          case END:
             if(val_stack[stack_head - 1]->p_type == IF && val_stack[stack_head - 1]->as.cond[1] == -1){ // No else statement
@@ -388,7 +421,7 @@ const char *rtoken_str(const RToken *rtoken){
          sprintf(_buffer, "Word(%s)", rtoken->as.word);
       break;
       case NUMBER:
-         sprintf(_buffer, "Number(%f)", rtoken->as.number);
+         sprintf(_buffer, "Number(%f)(%ld)", rtoken->as.number, rtoken->as.decimal);
       break;
       case EQ:
          sprintf(_buffer, "Equals");

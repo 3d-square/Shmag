@@ -5,6 +5,8 @@ p := 54
 func hello()
    i := 1
    j := 2
+
+   . i + j
 end
 
 hello()
