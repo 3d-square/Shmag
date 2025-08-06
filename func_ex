@@ -1,7 +1,10 @@
 proto hello()
 
-func hello()
+p := 54
 
+func hello()
+   i := 1
+   j := 2
 end
 
 hello()

@@ -181,7 +181,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
                      token_errorf("Mismatched number of '(' and ')' on the same line\n", curr_token);
                      error = 1;
                   }
-                  tokens[i - 1].p_type = CALL;
+                  tokens[i - 2].p_type = CALL;
                   func_call = 1;
                }
             }else{

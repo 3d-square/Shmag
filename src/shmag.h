@@ -86,10 +86,12 @@ typedef struct {
 } RToken;
 
 typedef struct  _shm_func{
+   char *func_name;
    int num_args;
    const char **args;
    RToken *tokens;
    int num_tokens;
+   int initialized;
 } ShmFunc;
 
 typedef struct node {
