@@ -4,9 +4,12 @@ p := 54
 
 func hello()
    i := 1
-   j := 2
+   j := i * 2
 
    . i + j
 end
 
 hello()
+
+. i
+. j

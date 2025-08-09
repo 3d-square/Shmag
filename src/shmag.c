@@ -6,11 +6,11 @@
 void print_executable(const char *name, RToken *exe, int len){
    char buffer[256];
    sprintf(buffer, "%s.im", name);
-   FILE *fp = fopen(buffer, "w");
+   FILE *fp = /* fopen(buffer, "w") */ stdout;
    for(int i = 0; i < len; ++i){
       fprintf(fp, "%d: %s\n", i, rtoken_str(&exe[i]));
    }
-   fclose(fp);
+   if(fp != stdout && fp != stderr) fclose(fp);
 }
 
 void print_im(PToken *exe, int len){
@@ -74,6 +74,7 @@ int main(int argc, char **argv){
          printf(">>> ");
          fflush(stdin);
       }
+      destroy_rmap(&env.funcs, free_shm_function);
    }else{
       read_to_buffer(argv[1], buffer, 8192);
 
@@ -86,6 +87,7 @@ int main(int argc, char **argv){
             printf("Executable was built\n\n");
             // print_executable(argv[1], runnable, runnable_len);
             execute_runnable(&env, runnable, runnable_len);
+            destroy_rmap(&env.funcs, free_shm_function);
          }else{
             printf("Unable to create an executable\n");
          }

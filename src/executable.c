@@ -15,12 +15,11 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
 }
 
 int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head){
+   printf("Calling %s, with %d args\n", func->func_name, func->num_args);
    // Push Arguments to the variables
    for(int i = 0; i < func->num_args; ++i){
       insert_rmap(&env->variables, func->args[i], SHM_INT, stack[*stack_head + i - func->num_args]);
    }
-   // Call function
-   print_executable("function", func->tokens, func->num_tokens);
    int status = execute_tokens(env, stack + *stack_head, func->tokens, func->num_tokens);
 
    // Pop args on the stack
@@ -99,9 +98,7 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          break;
          case CALL:
             ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
-            printf("Calling %s, with %d args\n", curr->as.word, func_info->num_args);
             execute_function(env, func_info, stack, &stack_head);
-            return 1;
          break;
          default:
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));
@@ -249,4 +246,24 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
             exit(1);
       }
    }
+}
+
+void free_function(ShmFunc *func){
+   free(func->func_name);
+   for(int i = 0; i < func->num_args; ++i){
+      free(func->args[i]);
+   }
+   free(func->args);
+
+   free_rtokens(func->tokens, func->num_tokens);
+   free(func->tokens);
+   free(func);
+}
+
+void free_shm_function(ShmObj *func){
+   free_function(func->as.func);
+}
+
+void free_rtokens(RToken *tokens, int num_tokens){
+
 }

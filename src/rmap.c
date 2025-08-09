@@ -95,6 +95,21 @@ void delete_rmap(RMap *map, const char *key){
    }
 }
 
+void destroy_rmap(RMap *map, destroy_func del){
+   for(int i = 0; i < MAX_BUCKETS; ++i){
+      if(map->arr[i]){
+         RNode *curr = map->arr[i];
+         while(curr){
+            RNode *next = curr->next;
+            del(&curr->obj);
+            free(curr->key);
+            free(curr);
+            curr = next;
+         }
+      }
+   }
+}
+
 const char *shm_type_str(ShmType type){
    switch(type){
       case SHM_INT:

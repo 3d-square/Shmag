@@ -76,13 +76,12 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
    
    for(int i = 0; i < num_tokens; ++i){
       PToken *curr = &tokens[i];
+      // printf("curr_token = %s\n", ptoken_str(curr));
       switch(OP_MASK(curr->p_type)){
          case WORD:
             // Check if the value is being set
-            if(i + 1 < num_tokens){
-               if(tokens[i + 1].p_type == SET){
-                  val_stack[stack_head++] = curr;
-               }
+            if(i + 1 < num_tokens && tokens[i + 1].p_type == SET){
+               val_stack[stack_head++] = curr;
             }else{
                expression_push(curr, runnable, &op_index, &env->variables);
             }
@@ -301,6 +300,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                func_info->num_tokens = func_size;
             }else{
                printf("%s - Something went wrong\n", ptoken_str(val_stack[stack_head - 1]));
+               return -1;
             }
          break;
          default:
@@ -591,6 +591,7 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
          }
          function->num_tokens = op_index;
          function->initialized = 1;
+         function->func_name = strdup(tokens[start + 1].as.word);
       }
    }else{
       function = calloc(1, sizeof(ShmFunc));

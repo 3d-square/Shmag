@@ -88,7 +88,7 @@ typedef struct {
 typedef struct  _shm_func{
    char *func_name;
    int num_args;
-   const char **args;
+   char **args;
    RToken *tokens;
    int num_tokens;
    int initialized;
@@ -122,6 +122,8 @@ typedef struct {
    RMap funcs;
 } REnv;
 
+typedef void (*destroy_func)(ShmObj *obj);
+
 void parse_as_tokens(const char *, PToken *tokens, int *num_tokens);
 
 /* Interpreter Stages */
@@ -140,12 +142,16 @@ const char *rtoken_str(const RToken *rtoken);
 void print_rtoken(const RToken *rtoken);
 const char *shm_type_str(ShmType type);
 void print_executable(const char *name, RToken *exe, int len);
+void free_shm_function(ShmObj *func);
+void free_rtokens(RToken *tokens, int num_tokens);
 
 /* Map Functions */
 void delete_rmap(RMap *map, const char *key);
 void insert_rmap(RMap *map, const char *key, ShmType type, MultiVal value);
 ShmObj *search_rmap(RMap *map, const char *key);
 RNode *node_search_rmap(RMap *map, const char *key, int *hash);
+void destroy_rmap(RMap *map, destroy_func del);
+
 int hash_function(const char *key);
 
 void delete_vmap(VMap *map, const char *key);
