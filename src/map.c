@@ -56,7 +56,7 @@ void delete_vmap(VMap *map, const char *key){
    int bucket = hash_function(key);
 
    VNode *prev = NULL;
-   VNode *curr = NULL;
+   VNode *curr = map->arr[bucket];
 
    while(curr != NULL){
       if(strcmp(key, curr->key) == 0){
@@ -66,6 +66,7 @@ void delete_vmap(VMap *map, const char *key){
             prev->next = curr->next;
          }
 
+         free(curr->key);
          free(curr);
          break;
       }

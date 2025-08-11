@@ -2,6 +2,10 @@ proto hello()
 
 p := 54
 
+func hi(i)
+   . i
+end
+
 func hello()
    i := 1
    j := i * 2
@@ -11,5 +15,6 @@ end
 
 hello()
 
+hi(9198)
+
 . i
-. j

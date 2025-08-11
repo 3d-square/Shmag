@@ -15,7 +15,6 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
 }
 
 int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head){
-   printf("Calling %s, with %d args\n", func->func_name, func->num_args);
    // Push Arguments to the variables
    for(int i = 0; i < func->num_args; ++i){
       insert_rmap(&env->variables, func->args[i], SHM_INT, stack[*stack_head + i - func->num_args]);
@@ -24,7 +23,7 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
 
    // Pop args on the stack
    for(int i = 0; i < func->num_args; ++i){
-      delete_rmap(&env->variables, func->args[i]);
+      delete_rmap(&env->variables, func->args[i], NULL);
    }
    *stack_head = *stack_head - func->num_args;
 
@@ -72,7 +71,7 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
             if((obj_ptr = search_rmap(&env->variables, curr->as.word)) != NULL){
                stack[stack_head++] = obj_ptr->as;
             }else{
-               fprintf(stderr, "Variable '%s' has not been set\n", curr->as.word);
+               fprintf(stderr, "Variable %d '%s' has not been set\n", op_index, curr->as.word);
                return 1;
             }
          break;
@@ -99,6 +98,9 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          case CALL:
             ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
             execute_function(env, func_info, stack, &stack_head);
+         break;
+         case DEL_VAR:
+            delete_rmap(&env->variables, curr->as.word, NULL);
          break;
          default:
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));
@@ -265,5 +267,16 @@ void free_shm_function(ShmObj *func){
 }
 
 void free_rtokens(RToken *tokens, int num_tokens){
-
+   return;
+   for(int i = 0; i < num_tokens; ++i){
+      switch(tokens[i].r_type){
+         case SET_WORD:
+         case WORD:
+            printf("free(%s) at %p\n", tokens[i].as.word, tokens[i].as.word);
+            free(tokens[i].as.word);
+         break;
+         default:
+         break;
+      }
+   }
 }

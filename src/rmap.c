@@ -71,11 +71,11 @@ void insert_rmap(RMap *map, const char *key, ShmType type, MultiVal value){
    }
 }
 
-void delete_rmap(RMap *map, const char *key){
+void delete_rmap(RMap *map, const char *key, destroy_func del){
    int bucket = hash_function(key);
 
    RNode *prev = NULL;
-   RNode *curr = NULL;
+   RNode *curr = map->arr[bucket];
 
    while(curr != NULL){
       if(strcmp(key, curr->key) == 0){
@@ -86,6 +86,9 @@ void delete_rmap(RMap *map, const char *key){
          }
 
          free(curr->key);
+         if(del){
+            del(&curr->obj);
+         }
          free(curr);
          break;
       }

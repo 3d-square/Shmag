@@ -34,6 +34,7 @@ typedef enum {
    CALL,
    PROTO_FUNC,
    EXPR_SEP,
+   DEL_VAR,
 } TokenType;
 
 #define OP_MASK(op) (op & 0xFFFF)
@@ -145,8 +146,13 @@ void print_executable(const char *name, RToken *exe, int len);
 void free_shm_function(ShmObj *func);
 void free_rtokens(RToken *tokens, int num_tokens);
 
+// setup/cleanup/inspect scope
+void start_scope(const char *scp);
+void end_scope();
+char *static_scoped_var(const char *var);
+
 /* Map Functions */
-void delete_rmap(RMap *map, const char *key);
+void delete_rmap(RMap *map, const char *key, destroy_func del);
 void insert_rmap(RMap *map, const char *key, ShmType type, MultiVal value);
 ShmObj *search_rmap(RMap *map, const char *key);
 RNode *node_search_rmap(RMap *map, const char *key, int *hash);
