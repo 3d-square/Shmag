@@ -147,9 +147,11 @@ void free_shm_function(ShmObj *func);
 void free_rtokens(RToken *tokens, int num_tokens);
 
 // setup/cleanup/inspect scope
-void start_scope(const char *scp);
+void start_scope();
 void end_scope();
 char *static_scoped_var(const char *var);
+char *offset_scoped_var(const char *var, int offset);
+char *find_scoped_variable(char *word, RMap *map);
 
 /* Map Functions */
 void delete_rmap(RMap *map, const char *key, destroy_func del);

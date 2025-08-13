@@ -5,7 +5,7 @@ p := 54
 func hi(i)
    . i
 end
-
+i := 100
 func hello()
    i := 1
    j := i * 2
@@ -14,7 +14,6 @@ func hello()
 end
 
 hello()
+. i
 
 hi(9198)
-
-. i

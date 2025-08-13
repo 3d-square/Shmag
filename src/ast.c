@@ -59,6 +59,8 @@ static struct {
    int size;
 } registered_words;
 
+static int scope_prefix = '\0';
+
 void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map);
 int expression_flush(RToken *runnable, int *num_run_tokens);
 void encode_operand(RToken *tkn);
@@ -82,6 +84,10 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          case WORD:
             // Check if the value is being set
             if(i + 1 < num_tokens && tokens[i + 1].p_type == SET){
+               char *scoped_word = find_scoped_variable(curr->as.word, &env->variables);
+               if(scoped_word != NULL){
+                  curr->as.word = scoped_word;
+               }
                val_stack[stack_head++] = curr;
             }else{
                expression_push(curr, runnable, &op_index, &env->variables);
@@ -294,12 +300,12 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                      .r_type = DEL_VAR,
                      .as.word = func_info->args[arg_i]
                   };
-                  deregister_word(func_info->args[arg_i], &env->variables);
-                  printf("deregistering %s\n", func_info->args[arg_i]);
+                  deregister_word(static_scoped_var(func_info->args[arg_i]), &env->variables);
+                  // printf("deregistering %s\n", func_info->args[arg_i]);
                }
-               for(int reg_i = 0; i < registered_words.size; ++i){
-                  printf("%s\n", registered_words.words[reg_i].word);
-               }
+               // for(int reg_i = 0; i < registered_words.size; ++i){
+               //    printf("%s\n", registered_words.words[reg_i].word);
+               // }
 
                int func_size = op_index - func_info->num_tokens;
                // printf("func_size = %d\n", func_size);
@@ -311,7 +317,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                func_info->tokens = calloc(sizeof(RToken), func_size);
                // copy function ops into function tokens
                memcpy(func_info->tokens, runnable + func_info->num_tokens, func_size * sizeof(RToken));
-               
+               end_scope();
                // decrement op_index by num_tokens and set func->num_tokens
                func_info->num_tokens = func_size;
                op_index -= func_info->num_tokens;
@@ -346,8 +352,8 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
       if(OP_MASK(tkn->p_type) == NUMBER){
          expression.types[expression.types_head] = NUMBER_IS_FLT(tkn->p_type);
       }else{
-         ShmType word_type = is_word_registered(tkn->as.word, map);
-         printf("%s - %s\n", tkn->as.word, shm_type_str(word_type));
+         char *scoped_word = find_scoped_variable(tkn->as.word, map);
+         ShmType word_type = is_word_registered(scoped_word, map);
          if(word_type == SHM_NULL){
             fprintf(stderr, "%d, %d: ", tkn->line, tkn->col);
             fprintf(stderr, "'%s' has not been declared in this scope\n", tkn->as.word);
@@ -357,7 +363,8 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
          if(word_type == SHM_DBL){
             expression.type = SHM_DBL;
          }
-  
+
+         tkn->as.word = scoped_word;
          expression.types[expression.types_head] = word_type == SHM_DBL;
       }
 
@@ -541,6 +548,7 @@ void register_word(const char *word, ShmType type, RMap *map){
    }
 
    if(is_word_registered(word, map) == SHM_NULL){
+      // printf("Registering word %s with type %s\n", word, shm_type_str(type));
       registered_words.words[registered_words.size++] = (struct typed_word){
          .word = word,
          .type = type
@@ -564,19 +572,42 @@ void deregister_word(const char *word, RMap *map){
    }
 }
 
+char *find_scoped_variable(char *word, RMap *map){
+   if(search_rmap(map, word) != NULL){
+      return word;
+   }else{
+      for(int i = 0; i < registered_words.size; ++i){
+         if(strstr(registered_words.words[i].word, word)){
+            // Search scope top to scope bottom? its the oppositie of what it looks like
+            for(int scope_offset = 0; scope_offset <= scope_prefix; scope_offset++){
+               char *scoped_word = offset_scoped_var(word, scope_offset);
+               if(strcmp(scoped_word, registered_words.words[i].word) == 0){
+                  free(word);
+                  return strdup(scoped_word);
+               }
+            }
+         }
+      }
+   }
+
+   return NULL;
+}
+
 ShmType is_word_registered(const char *word, RMap *map){
    ShmType result = SHM_NULL;
    ShmObj *obj;
 
+   if(word == NULL){
+      return SHM_NULL;
+   }
+
    if((obj = search_rmap(map, word)) != NULL){
       result = obj->obj_type;
    }else{
-      printf("num_words = %d\n", registered_words.size);
       for(int i = 0; i < registered_words.size; ++i){
-         printf("word: %s\n", registered_words.words[i].word);
          if(strcmp(word, registered_words.words[i].word) == 0){
             result = registered_words.words[i].type;
-            // break;
+            break;
          }
       }
    }
@@ -622,10 +653,10 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
             token_errorf("Double initialization of function %s", &tokens[start], tokens[start + 1].as.word);
             return 1;
          }
-
+         start_scope();
          function->args = calloc(sizeof(char *), num_args);
          while(i < num_args){
-            function->args[i] = strdup(tokens[start + (i * 2) + 3].as.word);
+            function->args[i] = strdup(static_scoped_var(tokens[start + (i * 2) + 3].as.word));
             register_word(function->args[i], SHM_INT, &env->variables);
             i++;
          }
@@ -638,9 +669,9 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
       function->num_args = num_args;
       if(!is_proto){
          function->args = calloc(sizeof(char *), num_args);
-
+         start_scope();
          while(i < num_args){
-            function->args[i] = strdup(tokens[start + (i * 2) + 3].as.word);
+            function->args[i] = strdup(static_scoped_var(tokens[start + (i * 2) + 3].as.word));
             register_word(function->args[i], SHM_INT, &env->variables);
             i++;
          }
@@ -654,27 +685,46 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
    return 0;
 }
 
-static char scope_name[1000] = {'\0'};
-void start_scope(const char *scp){
-   strcat("\n");
-   strcat(scope_name, scp);
+void start_scope(){
+   scope_prefix +=  1;
+   
+   /* detect integer overflow */
+   if(scope_prefix < 0){
+      fprintf(stderr, "Too many nested scopes\n");
+      exit(1);
+   }
 }
 
 void end_scope(){
-   char *scope_sep = strrchr(scope_name, '\n');
+   scope_prefix -= 1;;
 
-   if(scope_sep == NULL){
+   /* Detect integer below 0 */
+   if(scope_prefix < 0){
       fprintf(stderr, "Trying to close a scope that has not been initialized\n");
       exit(1);
    }
-
-   *scope_sep = '\0';
 }
 
 char *static_scoped_var(const char *var){
    static char scoped_var[1500];
 
-   sprintf(scope_name, "%s%s", scope_name, var);
+   if(scope_prefix){
+      sprintf(scoped_var, "%x-%s", scope_prefix, var);
+   }else{
+      strcpy(scoped_var, var);
+   }
+
+   return scoped_var;
+}
+
+char *offset_scoped_var(const char *var, int offset){
+   static char scoped_var[1500];
+
+   if(scope_prefix - offset > 0){
+      sprintf(scoped_var, "%x-%s", scope_prefix - offset, var);
+   }else{
+      strcpy(scoped_var, var);
+   }
 
    return scoped_var;
 }
