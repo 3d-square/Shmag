@@ -85,9 +85,12 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             // Check if the value is being set
             if(i + 1 < num_tokens && tokens[i + 1].p_type == SET){
                char *scoped_word = find_scoped_variable(curr->as.word, &env->variables);
-               if(scoped_word != NULL){
-                  curr->as.word = scoped_word;
+               if(scoped_word == NULL){
+                  scoped_word = strdup(static_scoped_var(curr->as.word));
+                  free(curr->as.word);
+                  
                }
+               curr->as.word = scoped_word;
                val_stack[stack_head++] = curr;
             }else{
                expression_push(curr, runnable, &op_index, &env->variables);
@@ -696,7 +699,22 @@ void start_scope(){
 }
 
 void end_scope(){
-   scope_prefix -= 1;;
+   char scope_prefix_str[18];
+   sprintf(scope_prefix_str, "%x-", scope_prefix);
+   size_t prefix_len = strlen(scope_prefix_str);
+   scope_prefix -= 1;
+
+   int i, j = 0;
+   for(i = 0; i < registered_words.size; ++i){
+      if(strncmp(scope_prefix_str, registered_words.words[i].word, prefix_len) != 0){
+         // add del kw
+         registered_words.words[j++] = registered_words.words[i];
+      }else{
+         printf("Removing %s\n", registered_words.words[i].word);
+      }
+   }
+
+   registered_words.size = j;
 
    /* Detect integer below 0 */
    if(scope_prefix < 0){

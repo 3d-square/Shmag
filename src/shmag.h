@@ -118,6 +118,16 @@ typedef struct v_hashMap{
    VNode *arr[MAX_BUCKETS];
 } VMap;
 
+typedef struct s_node {
+   char *key;
+   struct s_node *next;
+} SNode;
+
+typedef struct s_set{
+   int num_elems;
+   SNode *arr[MAX_BUCKETS];
+} SSet;
+
 typedef struct {
    RMap variables;
    RMap funcs;
@@ -166,5 +176,10 @@ void delete_vmap(VMap *map, const char *key);
 void insert_vmap(VMap *map, const char *key, void *value);
 void *search_vmap(VMap *map, const char *key);
 VNode *node_search_vmap(VMap *map, const char *key, int *hash);
+
+void set_add(SSet *set, const char *key);
+void set_remove(SSet *set, const char *key);
+int  set_contains(SSet *set, const char *key);
+SNode *node_search_set(SSet *map, const char *key, int *hash);
 
 #endif
