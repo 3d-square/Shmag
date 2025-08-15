@@ -6,7 +6,7 @@
 void print_executable(const char *name, RToken *exe, int len){
    char buffer[256];
    sprintf(buffer, "%s.im", name);
-   FILE *fp = fopen(buffer, "w");
+   FILE *fp = stdout; // fopen(buffer, "w");
    for(int i = 0; i < len; ++i){
       fprintf(fp, "%d: %s\n", i, rtoken_str(&exe[i]));
    }

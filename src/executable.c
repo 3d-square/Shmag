@@ -17,7 +17,7 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
 int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head){
    // Push Arguments to the variables
    for(int i = 0; i < func->num_args; ++i){
-      insert_rmap(&env->variables, func->args[i], SHM_INT, stack[*stack_head + i - func->num_args]);
+      insert_rmap(&env->variables, func->args[i], func->types[i], stack[*stack_head + i - func->num_args]);
    }
    int status = execute_tokens(env, stack + *stack_head, func->tokens, func->num_tokens);
 

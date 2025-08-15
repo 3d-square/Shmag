@@ -70,6 +70,7 @@ void check_init_shm(RToken *runnable, int *num_run_tokens);
 int parse_function_header(REnv *env, PToken *tokens, int start, int op_index);
 ShmType expression_type();
 ShmType is_word_registered(const char *word, RMap *map);
+ShmType conv_to_shm(TokenType type);
 
 int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens){
    int op_index = 0;
@@ -215,7 +216,6 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             }
          break;
          case CALL:
-            printf("Calling function %s\n", curr->as.word);
             // Verify number of arguments
             int size = 0;
             ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
@@ -249,7 +249,6 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                }
                runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                stack_head--;
-               
             }else{
                token_errorf("Paren Close is not supported for non CALL type", val_stack[stack_head - 1]);
             }
@@ -260,7 +259,6 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = op_index - 1;
                stack_head--;
             }else if(val_stack[stack_head - 1]->p_type == IF){ // If statement has else statement
-               // printf("%d, %d\n", op_index - 1, val_stack[stack_head - 1]->as.cond[1]);
                runnable[val_stack[stack_head - 1]->as.cond[1]].as.cond[0] = op_index - 1; // GOTO statement
                runnable[val_stack[stack_head - 1]->as.cond[0]].as.cond[0] = val_stack[stack_head - 1]->as.cond[1]; // If statement
                stack_head--;
@@ -299,31 +297,28 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                ShmFunc *func_info = func_obj->as.func;
 
                for(int arg_i = 0; arg_i < func_info->num_args; ++arg_i){
-                  runnable[op_index++] = (RToken) {
-                     .r_type = DEL_VAR,
-                     .as.word = func_info->args[arg_i]
-                  };
+                  // runnable[op_index++] = (RToken) {
+                  //    .r_type = DEL_VAR,
+                  //    .as.word = func_info->args[arg_i]
+                  // };
                   deregister_word(static_scoped_var(func_info->args[arg_i]), &env->variables);
-                  // printf("deregistering %s\n", func_info->args[arg_i]);
                }
-               // for(int reg_i = 0; i < registered_words.size; ++i){
-               //    printf("%s\n", registered_words.words[reg_i].word);
-               // }
 
                int func_size = op_index - func_info->num_tokens;
-               // printf("func_size = %d\n", func_size);
-               // printf("fnuc_name = %s\n", val_stack[stack_head - 1]->as.word);
-               // printf("func_start = %d\n", func_info->num_tokens);
-               // printf("start tkn = %s\n", rtoken_str(&runnable[func_info->num_tokens]));
 
                // allocate space for function tokens
                func_info->tokens = calloc(sizeof(RToken), func_size);
                // copy function ops into function tokens
                memcpy(func_info->tokens, runnable + func_info->num_tokens, func_size * sizeof(RToken));
-               end_scope();
-               // decrement op_index by num_tokens and set func->num_tokens
                func_info->num_tokens = func_size;
+
+               // Exit scope
+               end_scope();
+
+               // decrement op_index by num_tokens and set func->num_tokens
                op_index -= func_info->num_tokens;
+
+               print_function(func_info);
             }else{
                printf("%s - Something went wrong\n", ptoken_str(val_stack[stack_head - 1]));
                return -1;
@@ -335,6 +330,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          break;
       }
    }
+   
    
    *num_run_tokens = op_index;
    return 0;
@@ -511,6 +507,9 @@ const char *rtoken_str(const RToken *rtoken){
       case END:
          sprintf(_buffer, "End");
       break;
+      case CALL:
+         sprintf(_buffer, "Call(%s)", rtoken->as.word);
+      break;
       case DEL_VAR:
          sprintf(_buffer, "Del(%s)", rtoken->as.word);
       break;
@@ -651,39 +650,31 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
          return 1;
       }
 
-      if(!is_proto){
-         if(function->initialized){
-            token_errorf("Double initialization of function %s", &tokens[start], tokens[start + 1].as.word);
-            return 1;
-         }
-         start_scope();
-         function->args = calloc(sizeof(char *), num_args);
-         while(i < num_args){
-            function->args[i] = strdup(static_scoped_var(tokens[start + (i * 2) + 3].as.word));
-            register_word(function->args[i], SHM_INT, &env->variables);
-            i++;
-         }
-         function->num_tokens = op_index;
-         function->initialized = 1;
-         function->func_name = strdup(tokens[start + 1].as.word);
-      }
    }else{
       function = calloc(1, sizeof(ShmFunc));
       function->num_args = num_args;
-      if(!is_proto){
-         function->args = calloc(sizeof(char *), num_args);
-         start_scope();
-         while(i < num_args){
-            function->args[i] = strdup(static_scoped_var(tokens[start + (i * 2) + 3].as.word));
-            register_word(function->args[i], SHM_INT, &env->variables);
-            i++;
-         }
-
-         function->num_tokens = op_index;
-         function->initialized = 1;
-      }
       insert_rmap(&env->funcs, tokens[start + 1].as.word, SHM_FUNC, (MultiVal){.func = function});
    }
+
+   if(!is_proto){
+      if(found && function->initialized){
+         token_errorf("Double initialization of function %s", &tokens[start], tokens[start + 1].as.word);
+         return 1;
+      }
+      start_scope();
+      function->args = calloc(sizeof(char *), num_args);
+      function->types = calloc(sizeof(ShmType), num_args);
+      while(i < num_args){
+         function->types[i] = conv_to_shm(tokens[start + (i * 3) + 3].p_type);
+         function->args[i] = strdup(static_scoped_var(tokens[start + (i * 3) + 4].as.word));
+         register_word(function->args[i], function->types[i], &env->variables);
+         i++;
+      }
+      function->num_tokens = op_index;
+      function->initialized = 1;
+      function->func_name = strdup(tokens[start + 1].as.word);
+   }
+
 
    return 0;
 }
@@ -709,9 +700,9 @@ void end_scope(){
       if(strncmp(scope_prefix_str, registered_words.words[i].word, prefix_len) != 0){
          // add del kw
          registered_words.words[j++] = registered_words.words[i];
-      }else{
+      }/* else{
          printf("Removing %s\n", registered_words.words[i].word);
-      }
+      } */
    }
 
    registered_words.size = j;
@@ -745,4 +736,35 @@ char *offset_scoped_var(const char *var, int offset){
    }
 
    return scoped_var;
+}
+
+ShmType conv_to_shm(TokenType type){
+   switch(type){
+      case TYPE_INT:
+         return SHM_INT;
+      break;
+      case TYPE_FLOAT:
+         return SHM_DBL;
+      break;
+      default:
+      break;
+   }
+   return SHM_NULL;
+}
+
+void print_function(const ShmFunc *func_info){
+   printf("Function: %s\n", func_info->func_name);
+   printf("  size: %d\n", func_info->num_tokens);
+   printf("  args: %d\n", func_info->num_args);
+   for(int i = 0; i < func_info->num_args; ++i){
+      printf("    %d: %s %s\n", i, shm_type_str(func_info->types[i]), func_info->args[i]);
+   }
+
+   printf("  tokens\n");
+   for(int i = 0; i < func_info->num_tokens; ++i){
+      printf("    %d: %s\n", i, rtoken_str(&func_info->tokens[i]));
+   }
+
+   printf("Function End\n\n");
+   // This is where I would print a return value
 }

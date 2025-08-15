@@ -35,6 +35,10 @@ typedef enum {
    PROTO_FUNC,
    EXPR_SEP,
    DEL_VAR,
+
+   /* Types */
+   TYPE_INT,
+   TYPE_FLOAT
 } TokenType;
 
 #define OP_MASK(op) (op & 0xFFFF)
@@ -90,6 +94,7 @@ typedef struct  _shm_func{
    char *func_name;
    int num_args;
    char **args;
+   ShmType *types;
    RToken *tokens;
    int num_tokens;
    int initialized;
@@ -181,5 +186,7 @@ void set_add(SSet *set, const char *key);
 void set_remove(SSet *set, const char *key);
 int  set_contains(SSet *set, const char *key);
 SNode *node_search_set(SSet *map, const char *key, int *hash);
+
+void print_function(const ShmFunc *func_info);
 
 #endif

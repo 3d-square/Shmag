@@ -12,6 +12,7 @@ enum extected_types{
    E_LINE  = 1 << 4,
    E_OPEN  = 1 << 5,
    E_CLOSE = 1 << 6,
+   E_TYPE  = 1 << 7,
 };
 
 int expect_type(const PToken *tokens, int index, int types);
@@ -125,6 +126,14 @@ int validate_syntax(PToken *tokens, int num_tokens){
          case LINE_SEP:
          break;
 
+         case TYPE_INT:
+         case TYPE_FLOAT:
+            if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD)){
+               token_errorf("Variable type expects word\n", curr_token);
+               error = 1;
+            }
+         break;
+
          case PROTO_FUNC:
          case FUNC:
             if(curr_token->p_type == FUNC || curr_token->p_type == PROTO_FUNC) func_header = 1;
@@ -137,16 +146,16 @@ int validate_syntax(PToken *tokens, int num_tokens){
                token_errorf("func expects '('\n", curr_token);
                error = 1;
             }
-            if(i + 3 >= num_tokens || !expect_type(tokens, i + 2, E_WORD | E_CLOSE)){
-               token_errorf("func expects word or ')'\n", curr_token);
+            if(i + 3 >= num_tokens || !expect_type(tokens, i + 2, E_TYPE | E_CLOSE)){
+               token_errorf("func expects type or ')'\n", curr_token);
                error = 1;
             }
 
          break;
          case PAREN_OPEN:
             if(func_header == 1){
-               if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_CLOSE)){
-                  token_errorf("WORD or ')' expected after '('", curr_token);
+               if(i >= num_tokens || !expect_type(tokens, i, E_TYPE | E_CLOSE)){
+                  token_errorf("Type or ')' expected after '('", curr_token);
                   error = 1;
                }else{
                   // Check from closing paren
@@ -163,9 +172,9 @@ int validate_syntax(PToken *tokens, int num_tokens){
                      error = 1;
                   }
                }
-            }else if(i > 1 && expect_type(tokens, i - 2, E_WORD)){
-               if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_CLOSE | E_VALUE)){
-                  token_errorf("WORD or ')' expected after '('", curr_token);
+            }else if(i > 1 && expect_type(tokens, i - 2, E_WORD)){ // function call
+               if(i >= num_tokens || !expect_type(tokens, i, E_TYPE| E_CLOSE | E_VALUE)){
+                  token_errorf("Type or ')' expected after '('", curr_token);
                   error = 1;
                }else{
                   // Check from closing paren
@@ -201,18 +210,23 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
          break;
          case EXPR_SEP:
-            if(func_header == 1 /* || nested[num_nested - 1] != FUNC_CALL */){
-               if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD)){
-                  token_errorf("seperator expects word\n", curr_token);
+            if(func_header == 1){
+               if(i + 1 >= num_tokens || !expect_type(tokens, i, E_TYPE)){
+                  token_errorf("seperator expects type", curr_token);
                   error = 1;
                }
 
-               if(i + 2 >= num_tokens || !expect_type(tokens, i + 1, E_LINE | E_SEP)){
-                  token_errorf("Seperator expects either EOL or seperator after following word\n", &tokens[i]);
+               if(i + 2 >= num_tokens || !expect_type(tokens, i + 1, E_WORD)){
+                  token_errorf("Seperator expects either EOL or seperator after following word", &tokens[i]);
+                  error = 1;
+               }
+            }else if(func_call == 1){
+               if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
+                  token_errorf("seperator expects type", curr_token);
                   error = 1;
                }
             }else{
-               token_errorf("',' is only supported for function definitions\n", curr_token);
+               token_errorf("',' is only supported for function definitions", curr_token);
             }
             
          break;
@@ -292,6 +306,11 @@ int expect_type(const PToken *tokens, int index, int types){
 
    if(types & E_CLOSE){
       if(tokens[index].p_type == PAREN_CLOSE) return 1;
+   }
+
+   if(types & E_TYPE){
+      if(tokens[index].p_type == TYPE_INT) return 1;
+      if(tokens[index].p_type == TYPE_FLOAT) return 1;
    }
 
    return 0;

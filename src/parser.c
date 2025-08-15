@@ -14,7 +14,7 @@ const char *skip_whitespace(const char *line){
 }
 
 int is_seperator(char c){
-   return strchr("_+-=:<>?,./!@#$%^&*() \n\t\r", c) != NULL;
+   return strchr("_+-=:<>?,/!@#$%^&*() \n\t\r", c) != NULL;
 }
 
 int has_next_token(const char *line){
@@ -64,6 +64,10 @@ void set_word_type(PToken *token){
       token->p_type = PROTO_FUNC;
    }else if(strcmp(token->as.word, ",") == 0){
       token->p_type = EXPR_SEP;
+   }else if(strcmp(token->as.word, "int") == 0){
+      token->p_type = TYPE_INT;
+   }else if(strcmp(token->as.word, "float") == 0){
+      token->p_type = TYPE_FLOAT;
    }else{
       char *end;
       double dbl = strtod(token->as.word, &end);
@@ -252,6 +256,12 @@ const char *ptoken_str(const PToken *ptoken){
       break;
       case SET_WORD:
          sprintf(_buffer, "SetWord(%s)", ptoken->as.word);
+      break;
+      case TYPE_INT:
+         sprintf(_buffer, "TypeInt");
+      break;
+      case TYPE_FLOAT:
+         sprintf(_buffer, "TypeFloat");
       break;
       case INIT_SHM:
       case PUSH_SHM:
