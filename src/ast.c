@@ -73,6 +73,8 @@ ShmType is_word_registered(const char *word, RMap *map);
 ShmType conv_to_shm(TokenType type);
 
 int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens){
+   log_set_file("ast.c");
+   log_msg("BUILDING EXECUTABLE");
    int op_index = 0;
    PToken *val_stack[1000];
    int stack_head = 0;
@@ -297,11 +299,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                ShmFunc *func_info = func_obj->as.func;
 
                for(int arg_i = 0; arg_i < func_info->num_args; ++arg_i){
-                  // runnable[op_index++] = (RToken) {
-                  //    .r_type = DEL_VAR,
-                  //    .as.word = func_info->args[arg_i]
-                  // };
-                  deregister_word(static_scoped_var(func_info->args[arg_i]), &env->variables);
+                  deregister_word(func_info->args[arg_i], &env->variables);
                }
 
                int func_size = op_index - func_info->num_tokens;
@@ -318,7 +316,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                // decrement op_index by num_tokens and set func->num_tokens
                op_index -= func_info->num_tokens;
 
-               print_function(func_info);
+               log_function(func_info);
             }else{
                printf("%s - Something went wrong\n", ptoken_str(val_stack[stack_head - 1]));
                return -1;
@@ -331,7 +329,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
       }
    }
    
-   
+   log_msg("EXECUTABLE BUILT WITH NO ERRORS\n");
    *num_run_tokens = op_index;
    return 0;
 }
@@ -518,10 +516,6 @@ const char *rtoken_str(const RToken *rtoken){
    return _buffer;
 }
 
-void print_rtoken(const RToken *rtoken){
-   printf("%s", rtoken_str(rtoken));
-}
-
 void encode_operand(RToken *tkn){
    int op_type = 0;
    TokenType orig_type = tkn->r_type;
@@ -559,8 +553,10 @@ void register_word(const char *word, ShmType type, RMap *map){
 }
 
 void deregister_word(const char *word, RMap *map){
+   log_str("UNREGISTER", word);
    if(search_rmap(map, word)){
-      fprintf(stderr, "Unable to deregister external token\n");
+      fprintf(stderr, "Warning: Unable to deregister external token\n");
+      log_msg("WARNING: Unable to deregister external token");
    }else{
       for(int i = 0; i < registered_words.size; ++i){
          if(strcmp(word, registered_words.words[i].word) == 0){
@@ -575,6 +571,7 @@ void deregister_word(const char *word, RMap *map){
 }
 
 char *find_scoped_variable(char *word, RMap *map){
+   log_str("FINDING SCOPED VARIABLE", word);
    if(search_rmap(map, word) != NULL){
       return word;
    }else{
@@ -585,13 +582,14 @@ char *find_scoped_variable(char *word, RMap *map){
                char *scoped_word = offset_scoped_var(word, scope_offset);
                if(strcmp(scoped_word, registered_words.words[i].word) == 0){
                   free(word);
+                  log_str("FOUND", scoped_word);
                   return strdup(scoped_word);
                }
             }
          }
       }
    }
-
+   log_msg("SCOPED VARIABLE NOT FOUND");
    return NULL;
 }
 
@@ -614,11 +612,14 @@ ShmType is_word_registered(const char *word, RMap *map){
       }
    }
 
+   log_str("WORD TYPE", shm_type_str(result));
+
    return result;
 }
 
 int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
    int is_proto = tokens[start].p_type == PROTO_FUNC;
+   log_str("PARSING FUNCTION", is_proto ? "PROTOTYPE" : "BODY");
 
    if(search_rmap(&env->variables, tokens[start + 1].as.word)){
       token_errorf("Cannot be used as both a variable and a function", &tokens[start + 1]);
@@ -627,6 +628,7 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
 
    ShmObj *func_wrapper = search_rmap(&env->funcs, tokens[start + 1].as.word);
    int found = func_wrapper != NULL;
+   log_str("FUNCTION", found ? "FOUND" : "NOT FOUND");
    ShmFunc *function;
 
    // get number of args
@@ -642,22 +644,26 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
       offset += 1;
    }
 
+   log_int("FUNCTION ARGS FOUND", num_args);
+
    if(found){
       // check if the number of args are the same
       function = func_wrapper->as.func;
       if(function->num_args != num_args){
+         log_msg("ERROR: Function Arg Mismatch");
          token_errorf("Found duplicate function header that does not have the same number of args as the original, found %d expected %d", &tokens[i + 1], num_args, function->num_args);
          return 1;
       }
-
    }else{
       function = calloc(1, sizeof(ShmFunc));
       function->num_args = num_args;
       insert_rmap(&env->funcs, tokens[start + 1].as.word, SHM_FUNC, (MultiVal){.func = function});
+      log_msg("MEMROY: Allocating New Function");
    }
 
    if(!is_proto){
       if(found && function->initialized){
+         log_msg("ERROR: Double Function Definition");
          token_errorf("Double initialization of function %s", &tokens[start], tokens[start + 1].as.word);
          return 1;
       }
@@ -681,7 +687,7 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
 
 void start_scope(){
    scope_prefix +=  1;
-   
+   log_msg("START SCOPE");
    /* detect integer overflow */
    if(scope_prefix < 0){
       fprintf(stderr, "Too many nested scopes\n");
@@ -700,13 +706,14 @@ void end_scope(){
       if(strncmp(scope_prefix_str, registered_words.words[i].word, prefix_len) != 0){
          // add del kw
          registered_words.words[j++] = registered_words.words[i];
-      }/* else{
-         printf("Removing %s\n", registered_words.words[i].word);
-      } */
+      }else{
+         log_str("DEREGISTERING", registered_words.words[i].word);
+      }
    }
 
    registered_words.size = j;
 
+   log_msg("END SCOPE");
    /* Detect integer below 0 */
    if(scope_prefix < 0){
       fprintf(stderr, "Trying to close a scope that has not been initialized\n");
@@ -752,19 +759,20 @@ ShmType conv_to_shm(TokenType type){
    return SHM_NULL;
 }
 
-void print_function(const ShmFunc *func_info){
-   printf("Function: %s\n", func_info->func_name);
-   printf("  size: %d\n", func_info->num_tokens);
-   printf("  args: %d\n", func_info->num_args);
+void log_function(const ShmFunc *func_info){
+   log_str("FUNCTION", func_info->func_name);
+   log_int("NUMBER TOKENS", func_info->num_tokens);
+   log_int("NUMBER ARGS", func_info->num_args);
    for(int i = 0; i < func_info->num_args; ++i){
-      printf("    %d: %s %s\n", i, shm_type_str(func_info->types[i]), func_info->args[i]);
+      log_str("ARG", func_info->args[i]);
+      log_str("TYPE", shm_type_str(func_info->types[i]));
    }
 
-   printf("  tokens\n");
+   log_msg("FUNCTION TOKENS");
    for(int i = 0; i < func_info->num_tokens; ++i){
-      printf("    %d: %s\n", i, rtoken_str(&func_info->tokens[i]));
+      log_rtoken("", &func_info->tokens[i]);
    }
 
-   printf("Function End\n\n");
+   log_msg("FUNCTION END");
    // This is where I would print a return value
 }

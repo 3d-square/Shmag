@@ -3,14 +3,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-void print_executable(const char *name, RToken *exe, int len){
-   char buffer[256];
-   sprintf(buffer, "%s.im", name);
-   FILE *fp = stdout; // fopen(buffer, "w");
+void log_executable(const char *name, RToken *exe, int len){
+   log_str("\nEXECUTABLE", name);
    for(int i = 0; i < len; ++i){
-      fprintf(fp, "%d: %s\n", i, rtoken_str(&exe[i]));
+      log_int("INDEX", i);
+      log_rtoken("TOKEN", &exe[i]);
    }
-   if(fp != stdout && fp != stderr) fclose(fp);
+   log_msg("END EXECUTABLE\n");
 }
 
 void print_im(PToken *exe, int len){
@@ -86,7 +85,7 @@ int main(int argc, char **argv){
          // print_im(tokens, num_tokens);
          if(build_runnable(tokens, num_tokens, &env, runnable, &runnable_len) != -1){
             printf("Executable was built\n\n");
-            print_executable(argv[1], runnable, runnable_len);
+            log_executable(argv[1], runnable, runnable_len);
             execute_runnable(&env, runnable, runnable_len);
             destroy_rmap(&env.funcs, free_shm_function);
             free_rtokens(runnable, runnable_len);

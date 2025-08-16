@@ -5,6 +5,9 @@
 #include <time.h>
 
 static FILE *_log;
+static const char *_file = "";
+
+#define LOG_PAD "20"
 
 void log_start(){
    char file_name[1000];
@@ -25,24 +28,32 @@ void log_stop(){
    }
 }
 
+void log_set_file(const char *file){
+   _file = file;
+}
+
 void log_msg(const char *msg){
-   fprintf(_log, "%s\n", msg);
+   if(msg[0] == '\0'){
+      fprintf(_log, "\n");
+   }else{
+      fprintf(_log, "[%s] %s\n", _file, msg);
+   }
 }
 
 void log_int(const char *msg, long val){
-   fprintf(_log, "%s - %ld\n", msg, val);
+   fprintf(_log, "[%s] %"LOG_PAD"s - %ld\n", _file, msg, val);
 }
 
 void log_str(const char *msg, const char *val){
-   fprintf(_log, "%s - %s\n", msg, val);
+   fprintf(_log, "[%s] %"LOG_PAD"s - %s\n", _file, msg, val);
 }
 
 void log_float(const char *msg, double val){
-   fprintf(_log, "%s - %f\n", msg, val);
+   fprintf(_log, "[%s] %"LOG_PAD"s - %f\n", _file, msg, val);
 }
 void log_rtoken(const char *msg, const RToken *tkn){
-   fprintf(_log, "%s - %s\n", msg, rtoken_str(tkn));
+   fprintf(_log, "[%s] %"LOG_PAD"s - %s\n", _file, msg, rtoken_str(tkn));
 }
 void log_ptoken(const char *msg, const PToken *tkn){
-   fprintf(_log, "%s - %s\n", msg, ptoken_str(tkn));
+   fprintf(_log, "[%s] %"LOG_PAD"s - %s\n", _file, msg, ptoken_str(tkn));
 }

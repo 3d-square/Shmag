@@ -88,7 +88,7 @@ void set_word_type(PToken *token){
       free(token->as.word);
    }
 
-   log_ptoken("Parsed", token);
+   log_ptoken("PARSED", token);
 }
 
 int is_token(const char *str){
@@ -173,6 +173,7 @@ const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_toke
 }
 
 void parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
+   log_set_file("parser.c");
    log_msg("START PARSING"); 
    int line = 0;
    *num_tokens = 0;

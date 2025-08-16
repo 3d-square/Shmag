@@ -20,6 +20,7 @@ const char *expect_type_str(int types);
 void log_expected(char *msg, const PToken *tkn, int types);
 
 int validate_syntax(PToken *tokens, int num_tokens){
+   log_set_file("syntax.c");
    log_msg("VALIDATING SYNTAX");
    int i = 0;
    int error = 0;
@@ -38,6 +39,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
          break;
 
          case SET:
+            log_msg("SET_WORD");
             if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
                token_errorf("Set operator expects a WORD or VALUE after the ':='", curr_token);
                error = 1;
@@ -56,6 +58,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
          case MOD:
          case MULT:
          case DIV:
+            log_msg("OPERATION");
              // Check rhs
              if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
                token_errorf("WORD or VALUE expected after operator", curr_token);
@@ -69,6 +72,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
          break;
          case DUMP:
+            log_msg("DUMP");
             if(i + 1 >= num_tokens){
                token_errorf("dump expects tokens to follow", curr_token);
                error = 1;
@@ -80,11 +84,13 @@ int validate_syntax(PToken *tokens, int num_tokens){
          break;
          case WHILE:
          case IF:
+            log_msg("IF/WHILE BLOCK");
             nested[num_nested++] = curr_token->p_type;
             if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
                token_errorf("If Statement expects a value", curr_token);
                error = 1;
             }else{
+               log_msg("VERIFY SCOPES MATCH");
                int end_match = 0;
                for(int j = i; j < num_tokens; ++j){
                   curr_token = &tokens[j];
@@ -101,13 +107,14 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
                error = end_match >= 0;
                if(error){
-                  token_errorf("If Statement expects an 'end'", curr_token);
+                  token_errorf("If/While Statement expects an 'end'", curr_token);
                }
             }
             
          break;
          case ELIF:
          case ELSE:
+            log_msg("ELSE/ELIF BLOCK");
             if(num_nested <= 0){
                token_errorf("Found 'else' without a matching 'if' statement", curr_token);
                error = 1;
@@ -119,6 +126,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
          break;
          case END:
+            log_msg("END BLOCK");
             num_nested--;
             if(num_nested < 0){
                token_errorf("Found 'end' without a matching control statement", curr_token);
@@ -131,6 +139,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
          case TYPE_INT:
          case TYPE_FLOAT:
+            log_msg("TYPE");
             if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD)){
                token_errorf("Variable type expects word\n", curr_token);
                error = 1;
@@ -139,8 +148,14 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
          case PROTO_FUNC:
          case FUNC:
-            if(curr_token->p_type == FUNC || curr_token->p_type == PROTO_FUNC) func_header = 1;
-            if(curr_token->p_type == FUNC) nested[num_nested++] = curr_token->p_type;
+            log_msg("FUNCTION HEADER");
+            func_header = 1;
+
+            if(curr_token->p_type == FUNC){
+               log_msg("FUNCTION BLOCK");
+               nested[num_nested++] = curr_token->p_type;
+            }
+
             if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD)){
                token_errorf("func expects word\n", curr_token);
                error = 1;
@@ -157,6 +172,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
          break;
          case PAREN_OPEN:
             if(func_header == 1){
+               log_msg("FUNCTION ARGS");
                if(i >= num_tokens || !expect_type(tokens, i, E_TYPE | E_CLOSE)){
                   token_errorf("Type or ')' expected after '('", curr_token);
                   error = 1;
@@ -176,6 +192,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
                   }
                }
             }else if(i > 1 && expect_type(tokens, i - 2, E_WORD)){ // function call
+               log_msg("FUNCTION CALL");
                if(i >= num_tokens || !expect_type(tokens, i, E_TYPE| E_CLOSE | E_VALUE)){
                   token_errorf("Type or ')' expected after '('", curr_token);
                   error = 1;
@@ -204,8 +221,10 @@ int validate_syntax(PToken *tokens, int num_tokens){
          // Checked for in paren open
          case PAREN_CLOSE:
             if(func_header == 1){
+               log_msg("END FUNCTION ARGS");
                func_header = 0;
             }else if(func_call == 1){
+               log_msg("END FUNCTION CALL");
                func_call = 0;
             }else{
                token_errorf("Parentheses are not currently supported outside of functions calls", curr_token);
@@ -213,7 +232,9 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
          break;
          case EXPR_SEP:
+            log_msg("SEPERATE EXPRESSIONS");
             if(func_header == 1){
+               log_msg("FUNCTION HEADER");
                if(i + 1 >= num_tokens || !expect_type(tokens, i, E_TYPE)){
                   token_errorf("seperator expects type", curr_token);
                   error = 1;
@@ -224,6 +245,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
                   error = 1;
                }
             }else if(func_call == 1){
+               log_msg("FUNCTION CALL");
                if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
                   token_errorf("seperator expects type", curr_token);
                   error = 1;
@@ -245,12 +267,13 @@ int validate_syntax(PToken *tokens, int num_tokens){
    
    if(num_nested > 0){
       for(int i = 0; i < num_nested; ++i){
-         printf("%d\n", nested[i]);
+         log_int("UNCLOSED BLOCK", nested[i]);
       }
       fprintf(stderr, "Not all blocks have been closed\n");
       return -1;
    }
 
+   log_msg("");
    return 0;
 }
 
@@ -331,10 +354,9 @@ void _token_errorf(const char *file, const char *func, int line, const char *fmt
 }
 
 void log_expected(char *msg, const PToken *tkn, int types){
-   log_msg("");
    log_msg(msg);
-   log_str("EXPECTED:", expect_type_str(types));
-   log_ptoken("ACTUAL TOKEN:", tkn);
+   log_str("EXPECTED", expect_type_str(types));
+   log_ptoken("ACTUAL TOKEN", tkn);
 }
 
 const char *expect_type_str(int types){

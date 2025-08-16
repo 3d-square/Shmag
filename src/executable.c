@@ -15,29 +15,37 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
 }
 
 int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head){
+   log_str("CALLING", func->func_name);
    // Push Arguments to the variables
    for(int i = 0; i < func->num_args; ++i){
+      log_str("SET VARIABLE", func->args[i]);
+      log_str("VARIABLE TYPE", shm_type_str(func->types[i]));
       insert_rmap(&env->variables, func->args[i], func->types[i], stack[*stack_head + i - func->num_args]);
    }
    int status = execute_tokens(env, stack + *stack_head, func->tokens, func->num_tokens);
 
+   log_msg("CLEANING UP FUNCTION CALL");
    // Pop args on the stack
    for(int i = 0; i < func->num_args; ++i){
+      log_str("DELETE", func->args[i]);
       delete_rmap(&env->variables, func->args[i], NULL);
    }
+   log_msg("RESET STACK");
    *stack_head = *stack_head - func->num_args;
+   log_int("STACK HEAD", *stack_head);
+   log_msg("EDN FUNCTION CALL");
 
    return status;
 }
 
 int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_len){
+   log_set_file("executable.c");
    ShmObj *obj_ptr;
    ShmObj result;
    int op_index = 0;
    int stack_head = 0;
    while(op_index < runnable_len){
       const RToken *curr = &runnable[op_index];
-      // printf("Token: %s\n", rtoken_str(curr));
       switch(OP_MASK(curr->r_type)){
          case NUMBER:
             stack[stack_head++] = curr->as;
@@ -58,7 +66,6 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          case MULT:
          case DIV:
          case MOD:
-            // printf("%s\n", rtoken_str(curr));
             perform_shm_operation(curr->r_type, SHM_DBL, stack[stack_head - 1], &result);
             stack_head--;
          break;
@@ -76,11 +83,10 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
             }
          break;
          case GOTO:
-            // printf("Going to %d\n", curr->as.cond[0]);
             op_index = curr->as.cond[0];
          break;
          case DUMP:
-            // 
+            //
             if(NUMBER_IS_FLT(curr->r_type)){
                printf("%f\n", stack[stack_head - 1].number);
             }else{
@@ -90,7 +96,6 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          break;
          case IF:
             if(!is_truthy(stack[stack_head - 1])){
-               // printf("%s\n", rtoken_str(curr));
                op_index = curr->as.cond[0];
             }
             stack_head--;
@@ -106,7 +111,6 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));
             return 1;
       }
-      // printf("op_index = %d\n", op_index);
       op_index++;
    }
 
@@ -129,23 +133,23 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
       switch(OP_MASK(op)){
          case GT:
             result->as.decimal = val.number > result->as.number;
-         break;                                               
-         case LT:                                             
+         break;
+         case LT:
             result->as.decimal = val.number < result->as.number;
-         break;                                               
-         case EQ:                                             
+         break;
+         case EQ:
             result->as.decimal = val.number == result->as.number;
-         break;                                               
-         case PLUS:                                           
+         break;
+         case PLUS:
             result->as.number = val.number + result->as.number;
-         break;                                               
-         case MINUS:                                          
+         break;
+         case MINUS:
             result->as.number = val.number - result->as.number;
-         break;                                               
-         case MULT:                                           
+         break;
+         case MULT:
             result->as.number = val.number * result->as.number;
-         break;                                               
-         case DIV:                                            
+         break;
+         case DIV:
             result->as.number = val.number / result->as.number;
          break;
          case MOD:
@@ -159,25 +163,25 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
    }else if(LHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.decimal = val.decimal > result->as.number;
-         break;                                          
-         case LT:                                        
-            result->as.decimal = val.decimal < result->as.number;
-         break;                                          
-         case EQ:                                        
-            result->as.decimal = val.decimal == result->as.number;
-         break;                                                
-         case PLUS:                                            
-            result->as.number = val.decimal + result->as.number;
-         break;                                                
-         case MINUS:                                           
-            result->as.number = val.decimal - result->as.number;
-         break;                                                
-         case MULT:                                            
-            result->as.number = val.decimal * result->as.number;
-         break;                                                
-         case DIV:                                             
-            result->as.number = val.decimal / result->as.number;
+            result->as.decimal = val.number > result->as.decimal;
+         break;
+         case LT:
+            result->as.decimal = val.number < result->as.decimal;
+         break;
+         case EQ:
+            result->as.decimal = val.number == result->as.decimal;
+         break;
+         case PLUS:
+            result->as.number = val.number + result->as.decimal;
+         break;
+         case MINUS:
+            result->as.number = val.number - result->as.decimal;
+         break;
+         case MULT:
+            result->as.number = val.number * result->as.decimal;
+         break;
+         case DIV:
+            result->as.number = val.number / result->as.decimal;
          break;
          case MOD:
             fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
@@ -190,25 +194,25 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
    }else if(RHS_IS_DBL(op)){
       switch(OP_MASK(op)){
          case GT:
-            result->as.decimal = val.number > result->as.decimal;
-         break;                              
-         case LT:                            
-            result->as.decimal = val.number < result->as.decimal;
-         break;                              
-         case EQ:                            
-            result->as.decimal = val.number == result->as.decimal;
-         break;                              
-         case PLUS:                          
-            result->as.number = val.number + result->as.decimal;
-         break;                              
-         case MINUS:                         
-            result->as.number = val.number - result->as.decimal;
-         break;                              
-         case MULT:                          
-            result->as.number = val.number * result->as.decimal;
-         break;                              
-         case DIV:                           
-            result->as.number = val.number / result->as.decimal;
+            result->as.decimal = val.decimal > result->as.number;
+         break;
+         case LT:
+            result->as.decimal = val.decimal < result->as.number;
+         break;
+         case EQ:
+            result->as.decimal = val.decimal == result->as.number;
+         break;
+         case PLUS:
+            result->as.number = val.decimal + result->as.number;
+         break;
+         case MINUS:
+            result->as.number = val.decimal - result->as.number;
+         break;
+         case MULT:
+            result->as.number = val.decimal * result->as.number;
+         break;
+         case DIV:
+            result->as.number = val.decimal / result->as.number;
          break;
          case MOD:
             fprintf(stderr, "When computing the modulo of two numbers they cannot be floating point\n");
@@ -221,23 +225,23 @@ void perform_shm_operation(TokenType op, ShmType shmType, MultiVal val, ShmObj *
       switch(OP_MASK(op)){
          case GT:
             result->as.decimal = val.decimal > result->as.decimal;
-         break;                                                  
-         case LT:                                                
+         break;
+         case LT:
             result->as.decimal = val.decimal < result->as.decimal;
-         break;                                                  
-         case EQ:                                                
+         break;
+         case EQ:
             result->as.decimal = val.decimal == result->as.decimal;
-         break;                                                  
-         case PLUS:                                              
+         break;
+         case PLUS:
             result->as.decimal = val.decimal + result->as.decimal;
-         break;                                                  
-         case MINUS:                                             
+         break;
+         case MINUS:
             result->as.decimal = val.decimal - result->as.decimal;
-         break;                                                  
-         case MULT:                                              
+         break;
+         case MULT:
             result->as.decimal = val.decimal * result->as.decimal;
-         break;                                                  
-         case DIV:                                               
+         break;
+         case DIV:
             result->as.decimal = val.decimal / result->as.decimal;
          break;
          case MOD:
