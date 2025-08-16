@@ -38,22 +38,28 @@ void log_msg(const char *msg){
    }else{
       fprintf(_log, "[%s] %s\n", _file, msg);
    }
+   fflush(_log);
 }
 
 void log_int(const char *msg, long val){
    fprintf(_log, "[%s] %"LOG_PAD"s - %ld\n", _file, msg, val);
+   fflush(_log);
 }
 
 void log_str(const char *msg, const char *val){
    fprintf(_log, "[%s] %"LOG_PAD"s - %s\n", _file, msg, val);
+   fflush(_log);
 }
 
 void log_float(const char *msg, double val){
    fprintf(_log, "[%s] %"LOG_PAD"s - %f\n", _file, msg, val);
+   fflush(_log);
 }
 void log_rtoken(const char *msg, const RToken *tkn){
    fprintf(_log, "[%s] %"LOG_PAD"s - %s\n", _file, msg, rtoken_str(tkn));
+   fflush(_log);
 }
 void log_ptoken(const char *msg, const PToken *tkn){
    fprintf(_log, "[%s] %"LOG_PAD"s - %s\n", _file, msg, ptoken_str(tkn));
+   fflush(_log);
 }
