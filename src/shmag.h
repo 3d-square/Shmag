@@ -189,4 +189,15 @@ SNode *node_search_set(SSet *map, const char *key, int *hash);
 
 void print_function(const ShmFunc *func_info);
 
+// Logging Functions
+void log_start();
+void log_stop();
+
+void log_msg(const char *);
+void log_int(const char *, long);
+void log_str(const char *, const char *);
+void log_float(const char *, double);
+void log_rtoken(const char *, const RToken *);
+void log_ptoken(const char *, const PToken *);
+
 #endif

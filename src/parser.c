@@ -87,6 +87,8 @@ void set_word_type(PToken *token){
    if(OP_MASK(token->p_type) != WORD && OP_MASK(token->p_type) != NUMBER){
       free(token->as.word);
    }
+
+   log_ptoken("Parsed", token);
 }
 
 int is_token(const char *str){
@@ -171,11 +173,13 @@ const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_toke
 }
 
 void parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
+   log_msg("START PARSING"); 
    int line = 0;
    *num_tokens = 0;
    while((lines = parse_line_as_tokens(lines, tokens, num_tokens, line))){
       line += 1;
    }
+   log_msg("");
 }
 
 const char *ptoken_str(const PToken *ptoken){
@@ -183,76 +187,80 @@ const char *ptoken_str(const PToken *ptoken){
 
    switch(OP_MASK(ptoken->p_type)){
       case WORD:
-         sprintf(_buffer, "Word[%d:%d](%s)", ptoken->line, ptoken->col, ptoken->as.word);
+         sprintf(_buffer, "Word(%s)", ptoken->as.word);
       break;
       case NUMBER:
-         sprintf(_buffer, "Number[%d:%d](%f)", ptoken->line, ptoken->col, ptoken->as.number);
+         if(NUMBER_IS_FLT(ptoken->p_type)){
+            sprintf(_buffer, "Float(%f)", ptoken->as.number);
+         }else{
+            sprintf(_buffer, "Integer(%ld)", ptoken->as.decimal);
+         }
       break;
       case EQ:
-         sprintf(_buffer, "Equals[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Equals");
       break;
       case GT:
-         sprintf(_buffer, "GreaterThan[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "GreaterThan");
       break;
       case LT:
-         sprintf(_buffer, "LessThan[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "LessThan");
       break;
       case SET:
-         sprintf(_buffer, "Set[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Set");
       break;
       case PLUS:
-         sprintf(_buffer, "Plus[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Plus");
       break;
       case MINUS:
-         sprintf(_buffer, "Minus[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Minus");
       break;
       case MULT:
-         sprintf(_buffer, "Mult[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Mult");
       break;
       case DIV:
-         sprintf(_buffer, "Divide[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Divide");
       break;
       case DUMP:
-         sprintf(_buffer, "Dump[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Dump");
       break;
       case FUNC:
-         sprintf(_buffer, "Function[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Function");
       break;
       case PROTO_FUNC:
-         sprintf(_buffer, "Prototype[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Prototype");
       break;
       case EXPR_SEP:
-         sprintf(_buffer, "Expr Sep[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Expr Sep");
       break;
       case IF:
-         sprintf(_buffer, "If[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "If");
       break;
       case ELSE:
-         sprintf(_buffer, "Else[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Else");
       break;
       case ELIF:
-         sprintf(_buffer, "Elif[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Elif");
       break;
       case END:
-         sprintf(_buffer, "End[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "End");
       break;
       case MOD:
-         sprintf(_buffer, "Mod[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "Mod");
       break;
       case PAREN_OPEN:
-         sprintf(_buffer, "'('[%d:%d]",  ptoken->line, ptoken->col);
+         sprintf(_buffer, "Open");
       break;
       case PAREN_CLOSE:
-         sprintf(_buffer, "')'[%d:%d]",  ptoken->line, ptoken->col);
+         sprintf(_buffer, "Close");
       break;
       case LINE_SEP:
-         sprintf(_buffer, "line_sep");
+         sprintf(_buffer, "NewLine");
       break;
       case GOTO:
-         sprintf(_buffer, "goto");
+         sprintf(_buffer, "Goto");
       break;
       case WHILE:
-         sprintf(_buffer, "While[%d:%d]", ptoken->line, ptoken->col);
+         sprintf(_buffer, "While");
       break;
       case SET_WORD:
          sprintf(_buffer, "SetWord(%s)", ptoken->as.word);
@@ -265,6 +273,9 @@ const char *ptoken_str(const PToken *ptoken){
       break;
       case INIT_SHM:
       case PUSH_SHM:
+      break;
+      default:
+         return "Unimplemented";
       break;
    }
 

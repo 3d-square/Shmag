@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-enum extected_types{
+enum expected_types{
    E_OP    = 1 << 0,
    E_WORD  = 1 << 1,
    E_VALUE = 1 << 2,
@@ -16,8 +16,11 @@ enum extected_types{
 };
 
 int expect_type(const PToken *tokens, int index, int types);
+const char *expect_type_str(int types);
+void log_expected(char *msg, const PToken *tkn, int types);
 
 int validate_syntax(PToken *tokens, int num_tokens){
+   log_msg("VALIDATING SYNTAX");
    int i = 0;
    int error = 0;
    int func_header = 0;
@@ -252,6 +255,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
 }
 
 int expect_type(const PToken *tokens, int index, int types){
+   log_expected("EXPECTING TOKEN", &tokens[index], types);
    if(types & E_OP){
       switch(OP_MASK(tokens[index].p_type)){
          case GT:
@@ -326,4 +330,56 @@ void _token_errorf(const char *file, const char *func, int line, const char *fmt
    va_end(args);
 }
 
+void log_expected(char *msg, const PToken *tkn, int types){
+   log_msg("");
+   log_msg(msg);
+   log_str("EXPECTED:", expect_type_str(types));
+   log_ptoken("ACTUAL TOKEN:", tkn);
+}
 
+const char *expect_type_str(int types){
+   static char _expect_type_str[1000];
+   char _buffer[100];
+   _expect_type_str[0] = '\0';
+
+   if(types & E_OP){
+      strcpy(_expect_type_str, "OP");
+   }
+
+   if(types & E_WORD){
+      sprintf(_buffer, "%sWORD", _expect_type_str[0] ? " | " : "");
+      strcat(_expect_type_str, _buffer);
+   }
+
+   if(types & E_VALUE){
+      sprintf(_buffer, "%sVALUE", _expect_type_str[0] ? " | " : "");
+      strcat(_expect_type_str, _buffer);
+   }  
+
+   if(types & E_SEP){
+      sprintf(_buffer, "%sSEP", _expect_type_str[0] ? " | " : "");
+      strcat(_expect_type_str, _buffer);
+   }
+ 
+   if(types & E_LINE){
+      sprintf(_buffer, "%sNEWLINE", _expect_type_str[0] ? " | " : "");
+      strcat(_expect_type_str, _buffer);
+   }  
+
+   if(types & E_OPEN){
+      sprintf(_buffer, "%sOPEN", _expect_type_str[0] ? " | " : "");
+      strcat(_expect_type_str, _buffer);
+   }
+
+   if(types & E_CLOSE){
+      sprintf(_buffer, "%sCLOSE", _expect_type_str[0] ? " | " : "");
+      strcat(_expect_type_str, _buffer);
+   }
+
+   if(types & E_TYPE){
+      sprintf(_buffer, "%sTYPE", _expect_type_str[0] ? " | " : "");
+      strcat(_expect_type_str, _buffer);
+   }
+
+   return _expect_type_str;
+}

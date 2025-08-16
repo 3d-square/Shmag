@@ -50,6 +50,7 @@ int main(int argc, char **argv){
    char buffer[8192] = {0};
    char file_name[64];
 
+   log_start();
    if(argc < 2){
       printf(">>> ");
       fflush(stdin);
@@ -95,7 +96,7 @@ int main(int argc, char **argv){
       }else{
          printf("Unable to validate syntax\n");
       }
-      
+      log_stop();
      
    }
 
