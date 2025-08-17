@@ -5,6 +5,8 @@
 #include <math.h>
 
 RToken to_rtoken(PToken *tkn){
+   log_msg("PTOKEN TO RTOKEN");
+   log_ptoken("ORIGINAL", tkn);
    RToken new_token = {
       .r_type = tkn->p_type,
       .as.word = NULL
@@ -13,6 +15,7 @@ RToken to_rtoken(PToken *tkn){
    if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER || tkn->p_type == SET_WORD || tkn->p_type == CALL){
       new_token.as = tkn->as;
    }
+   log_rtoken("CONVERTED", &new_token);
 
    return new_token;
 }
@@ -82,7 +85,6 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
    
    for(int i = 0; i < num_tokens; ++i){
       PToken *curr = &tokens[i];
-      // printf("curr_token = %s\n", ptoken_str(curr));
       switch(OP_MASK(curr->p_type)){
          case WORD:
             // Check if the value is being set
@@ -100,6 +102,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             }
          break;
          case PROTO_FUNC:
+            log_msg("FUNCTION PROTOTYPE");
             if(parse_function_header(env, tokens, i, op_index)){
                return -1;
             }
@@ -107,8 +110,10 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             while(tokens[i + 1].p_type != LINE_SEP){
                i++;
             }
+            log_msg("FUNCTION SKIP LINE");
          break;
          case FUNC:
+            log_msg("FUNCTION DEFINITION");
             if(parse_function_header(env, tokens, i, op_index)){
                return -1;
             }
@@ -118,6 +123,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             while(tokens[i + 1].p_type != LINE_SEP){
                i++;
             }
+            log_msg("FUNCTION SKIP LINE");
 
             // Push function to stack
          break;
@@ -335,9 +341,11 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
 }
 
 void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map){
+   log_msg("EXPRESSION PUSH");
    if(expression.line == -1){
       expression.type = SHM_INT;
       expression.line = tkn->line;
+      log_int("EXPRESSION LINE", tkn->line);
    }else{
       if(tkn->line != expression.line){
          fprintf(stderr, "Multiline expression found between lines %d and %d\n", expression.line, tkn->line);
@@ -346,6 +354,7 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
    }
 
    if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER){
+      log_msg("EXPRESSION PUSH VALUE");
       if(OP_MASK(tkn->p_type) == NUMBER){
          expression.types[expression.types_head] = NUMBER_IS_FLT(tkn->p_type);
       }else{
@@ -369,6 +378,7 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
       runnable[*num_run_tokens] = to_rtoken(tkn);
       *num_run_tokens = *num_run_tokens + 1;
    }else{
+      log_msg("EXPRESSION PUSH OPERAND");
       while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
          runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
 
@@ -386,6 +396,7 @@ ShmType expression_type(){
 }
 
 int expression_flush(RToken *runnable, int *num_run_tokens){
+   log_msg("EXPRESSION FLUSH");
    int tmp = expression.line;
    if(expression.line == -1){
       return 0;
