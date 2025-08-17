@@ -157,7 +157,7 @@ void print_ptoken(const PToken *ptoken);
 const char *rtoken_str(const RToken *rtoken);
 void print_rtoken(const RToken *rtoken);
 const char *shm_type_str(ShmType type);
-void print_executable(const char *name, RToken *exe, int len);
+void log_executable(const char *name, RToken *exe, int len);
 void free_shm_function(ShmObj *func);
 void free_rtokens(RToken *tokens, int num_tokens);
 
@@ -188,5 +188,19 @@ int  set_contains(SSet *set, const char *key);
 SNode *node_search_set(SSet *map, const char *key, int *hash);
 
 void print_function(const ShmFunc *func_info);
+
+// Logging Functions
+void log_start();
+void log_stop();
+void log_function(const ShmFunc *func_info);
+
+void log_set_file(const char *file);
+void log_obj(const char *, const ShmObj *);
+void log_msg(const char *);
+void log_int(const char *, long);
+void log_str(const char *, const char *);
+void log_float(const char *, double);
+void log_rtoken(const char *, const RToken *);
+void log_ptoken(const char *, const PToken *);
 
 #endif
