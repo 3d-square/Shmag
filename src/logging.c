@@ -63,3 +63,20 @@ void log_ptoken(const char *msg, const PToken *tkn){
    fprintf(_log, "[%s] %"LOG_PAD"s - %s\n", _file, msg, ptoken_str(tkn));
    fflush(_log);
 }
+
+void log_obj(const char *msg, const ShmObj *obj){
+   log_msg(msg);
+   switch(obj->obj_type){
+      case SHM_DBL:
+         log_float("VALUE", obj->as.number);
+      break;
+      case SHM_INT:
+         log_int("VALUE", obj->as.decimal);
+      break;
+      default:
+         log_str("SHMOBJ LOGGING IS NOT SUPPORTED FOR", shm_type_str(obj->obj_type));
+      break;
+   }
+
+   fflush(_log);
+}

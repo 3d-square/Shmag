@@ -1,17 +1,10 @@
-func addi ( int i1, int i2 )
+func add( int i1, int i2 )
+   . i1 + i2
+end
+func addflt( float i1, float i2 )
    . i1 + i2
 end
 
-addi(12,13)
 
-func addflt ( float i1, float i2 )
-   . i1 + i2
-end
-
-addflt(12.0, 13.1)
-
-func addiflt ( int i1, float i2 )
-   . i1 + i2 + i1
-end
-
-addiflt(12, 72.19)
+addflt(11.0, 10.)
+add(12,13)

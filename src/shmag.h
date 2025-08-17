@@ -195,6 +195,7 @@ void log_stop();
 void log_function(const ShmFunc *func_info);
 
 void log_set_file(const char *file);
+void log_obj(const char *, const ShmObj *);
 void log_msg(const char *);
 void log_int(const char *, long);
 void log_str(const char *, const char *);

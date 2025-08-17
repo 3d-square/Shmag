@@ -370,8 +370,6 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
       *num_run_tokens = *num_run_tokens + 1;
    }else{
       while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
-         check_init_shm(runnable, num_run_tokens);
-         
          runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
 
          encode_operand(&runnable[*num_run_tokens]);
@@ -380,21 +378,6 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
          expression.size -= 1;
       }
       expression.stack[expression.size++] = tkn;
-   }
-}
-
-void check_init_shm(RToken *runnable, int *num_run_tokens){
-   if(expression.first_op == 0){
-      runnable[*num_run_tokens] = (RToken){
-         .r_type = INIT_SHM,
-      };
-
-      if(expression.types[expression.types_head - 1]){
-         runnable[*num_run_tokens].r_type = runnable[*num_run_tokens].r_type | RHS_D;
-      }
-
-      *num_run_tokens = *num_run_tokens + 1;
-      expression.first_op = 1;
    }
 }
 
@@ -410,7 +393,6 @@ int expression_flush(RToken *runnable, int *num_run_tokens){
 
    expression.line = -1;
    while(expression.size > 0){
-      check_init_shm(runnable, num_run_tokens);
       
       runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
       encode_operand(&runnable[*num_run_tokens]);
@@ -443,31 +425,35 @@ const char *rtoken_str(const RToken *rtoken){
          sprintf(_buffer, "Word(%s) at %p", rtoken->as.word, rtoken->as.word);
       break;
       case NUMBER:
-         sprintf(_buffer, "Number(%f)(%ld)", rtoken->as.number, rtoken->as.decimal);
+         if(NUMBER_IS_FLT(rtoken->r_type)){
+            sprintf(_buffer, "Float(%f)", rtoken->as.number);
+         }else{
+            sprintf(_buffer, "Integer(%ld)", rtoken->as.decimal);
+         }
       break;
       case EQ:
-         sprintf(_buffer, "Equals");
+         sprintf(_buffer, "Equals[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case GT:
-         sprintf(_buffer, "GreaterThan");
+         sprintf(_buffer, "GreaterThan[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case LT:
-         sprintf(_buffer, "LessThan");
+         sprintf(_buffer, "LessThan[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case PLUS:
-         sprintf(_buffer, "Plus");
+         sprintf(_buffer, "Plus[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case MINUS:
-         sprintf(_buffer, "Minus");
+         sprintf(_buffer, "Minus[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case DIV:
-         sprintf(_buffer, "Div");
+         sprintf(_buffer, "Div[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case MULT:
-         sprintf(_buffer, "Mult");
+         sprintf(_buffer, "Mult[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case MOD:
-         sprintf(_buffer, "Mod");
+         sprintf(_buffer, "Mod[%s,%s]", rtoken->r_type & LHS_D ? "Float" : "Integer", rtoken->r_type & RHS_D ? "Float" : "Integer");
       break;
       case SET_WORD:
          sprintf(_buffer, "SetWord(%s) at %p", rtoken->as.word, rtoken->as.word);
@@ -520,12 +506,15 @@ void encode_operand(RToken *tkn){
    int op_type = 0;
    TokenType orig_type = tkn->r_type;
    // 1 means double, 0 means long
-   if(expression.types[expression.types_head - 1] == 1){
-      tkn->r_type = tkn->r_type | RHS_D;
-      op_type = 1;
-   }
+   log_str("LHS", expression.types[expression.types_head - 2] ? "Float" : "Integer");
    if(expression.types[expression.types_head - 2] == 1){
       tkn->r_type = tkn->r_type | LHS_D;
+      op_type = 1;
+   }
+
+   log_str("RHS", expression.types[expression.types_head - 1] ? "Float" : "Integer");
+   if(expression.types[expression.types_head - 1] == 1){
+      tkn->r_type = tkn->r_type | RHS_D;
       op_type = 1;
    }
 
@@ -533,8 +522,11 @@ void encode_operand(RToken *tkn){
       op_type = 0;
    }
 
+   log_str("EXPRESSION TYPE", op_type ? "Float" : "Integer");
+   log_rtoken("ENCODED OPERAND", tkn);
    expression.types_head--;
    expression.types[expression.types_head - 1] = op_type;
+   
 }
 
 void register_word(const char *word, ShmType type, RMap *map){
@@ -544,7 +536,8 @@ void register_word(const char *word, ShmType type, RMap *map){
    }
 
    if(is_word_registered(word, map) == SHM_NULL){
-      // printf("Registering word %s with type %s\n", word, shm_type_str(type));
+      log_str("REGISTERING WORD", word);
+      log_str("WORD TYPE", shm_type_str(type));
       registered_words.words[registered_words.size++] = (struct typed_word){
          .word = word,
          .type = type
@@ -703,6 +696,8 @@ void end_scope(){
 
    int i, j = 0;
    for(i = 0; i < registered_words.size; ++i){
+      log_int("WORD", i);
+      log_str("WORD", registered_words.words[i].word);
       if(strncmp(scope_prefix_str, registered_words.words[i].word, prefix_len) != 0){
          // add del kw
          registered_words.words[j++] = registered_words.words[i];
@@ -730,6 +725,7 @@ char *static_scoped_var(const char *var){
       strcpy(scoped_var, var);
    }
 
+   log_str("SCOPED VAR", scoped_var);
    return scoped_var;
 }
 
@@ -741,7 +737,7 @@ char *offset_scoped_var(const char *var, int offset){
    }else{
       strcpy(scoped_var, var);
    }
-
+   log_str("OFFSET SCOPED VAR", scoped_var);
    return scoped_var;
 }
 
