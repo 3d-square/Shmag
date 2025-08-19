@@ -35,7 +35,7 @@ int op_prec(TokenType type){
       break;
       case PAREN_OPEN:
       case PAREN_CLOSE:
-         return 3;
+         return -1;
       break;
       default:
          fprintf(stderr, "type(%d) is not implemented in op_prec\n", type);
@@ -88,7 +88,10 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
    int size;
    
    for(int i = 0; i < num_tokens; ++i){
+      log_msg("");
       PToken *curr = &tokens[i];
+      log_int("CURRENT INDEX", i);
+      log_ptoken("CURRENT TOKEN", curr);
       switch(OP_MASK(curr->p_type)){
          case WORD:
             // Check if the value is being set
@@ -375,7 +378,7 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
    }
 
    if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER){
-      log_msg("EXPRESSION PUSH VALUE");
+      log_str("EXPRESSION PUSH", OP_MASK(tkn->p_type) == NUMBER ? "NUMBER" : "WORD");
       if(OP_MASK(tkn->p_type) == NUMBER){
          expression.types[expression.types_head] = NUMBER_IS_FLT(tkn->p_type);
       }else{
@@ -396,10 +399,12 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
       }
 
       expression.types_head++;
+      log_ptoken("PUSHING", tkn);
       runnable[*num_run_tokens] = to_rtoken(tkn);
       *num_run_tokens = *num_run_tokens + 1;
    }else if(tkn->p_type == PAREN_OPEN){
       log_msg("PUSHING PAREN OPEN");
+      log_int("EXPRESSION SIZE", expression.size);
       expression.stack[expression.size++] = tkn;
    }else if(tkn->p_type == PAREN_CLOSE){
       log_msg("POPPING TILL PAREN OPEN");
