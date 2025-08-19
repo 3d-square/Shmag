@@ -66,8 +66,14 @@ void set_word_type(PToken *token){
       token->p_type = EXPR_SEP;
    }else if(strcmp(token->as.word, "int") == 0){
       token->p_type = TYPE_INT;
+   }else if(strcmp(token->as.word, "return") == 0){
+      token->p_type = RETURN;
    }else if(strcmp(token->as.word, "float") == 0){
       token->p_type = TYPE_FLOAT;
+   }else if(strcmp(token->as.word, "none") == 0){
+      token->p_type = TYPE_NONE;
+   }else if(strcmp(token->as.word, "->") == 0){
+      token->p_type = ARROW;
    }else{
       char *end;
       double dbl = strtod(token->as.word, &end);
@@ -94,6 +100,7 @@ void set_word_type(PToken *token){
 int is_token(const char *str){
    if(strncmp(str, ":=", 2) == 0) return 2;
    if(strncmp(str, "==", 2) == 0) return 2;
+   if(strncmp(str, "->", 2) == 0) return 2;
 
    if(strncmp(str, ">", 1) == 0) return 1;
    if(strncmp(str, "(", 1) == 0) return 1;
@@ -272,8 +279,14 @@ const char *ptoken_str(const PToken *ptoken){
       case TYPE_FLOAT:
          sprintf(_buffer, "TypeFloat");
       break;
-      case INIT_SHM:
-      case PUSH_SHM:
+      case TYPE_NONE:
+         sprintf(_buffer, "TypeNone");
+      break;
+      case RETURN:
+         sprintf(_buffer, "Return");
+      break;
+      case ARROW:
+         sprintf(_buffer, "Arrow");
       break;
       default:
          return "Unimplemented";

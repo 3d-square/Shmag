@@ -33,8 +33,9 @@ int op_prec(TokenType type){
       case MOD:
          return 2;
       break;
-      case DUMP:
-         return 3;
+      case PAREN_OPEN:
+      case PAREN_CLOSE:
+         return -1;
       break;
       default:
          fprintf(stderr, "type(%d) is not implemented in op_prec\n", type);
@@ -49,9 +50,8 @@ static struct {
    int size;
    int capacity;
    int line;
-   int first_op;
    ShmType type;
-} expression = {.types_head = 0, .capacity = 100, .size = 0, .line = -1, .first_op = 0};
+} expression = {.types_head = 0, .capacity = 100, .size = 0, .line = -1};
 
 struct typed_word{
    const char *word;
@@ -66,6 +66,7 @@ static int scope_prefix = '\0';
 
 void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map);
 int expression_flush(RToken *runnable, int *num_run_tokens);
+int expression_flush_parens(RToken *runnable, int *num_run_tokens);
 void encode_operand(RToken *tkn);
 void register_word(const char *word, ShmType type, RMap *map);
 void deregister_word(const char *word, RMap *map);
@@ -80,11 +81,17 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
    log_msg("BUILDING EXECUTABLE");
    int op_index = 0;
    PToken *val_stack[1000];
+   ShmFunc *func_info;
    int stack_head = 0;
    int expr_line = 0;
+   int size;
+   int j;
    
    for(int i = 0; i < num_tokens; ++i){
+      log_msg("");
       PToken *curr = &tokens[i];
+      log_int("CURRENT INDEX", i);
+      log_ptoken("CURRENT TOKEN", curr);
       switch(OP_MASK(curr->p_type)){
          case WORD:
             // Check if the value is being set
@@ -181,7 +188,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             expr_line = curr->line;
          break;
          case LINE_SEP:
-            if((expr_line = expression_flush(runnable, &op_index)) != 0){
+            if((expr_line = expression_flush_parens(runnable, &op_index)) != 0){
                if(val_stack[stack_head - 1]->p_type == SET_WORD){
                   runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                   if(expression_type() == SHM_DBL){
@@ -220,15 +227,27 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                   }
                   op_index++;
                   stack_head--;
+               }else if(val_stack[stack_head - 1]->p_type == RETURN){
+                  runnable[op_index++] = (RToken){
+                     .r_type = RETURN | SET_RET_INDEX,
+                  };
+
+                  stack_head--;
+
+                  // Check if next token is END. There always has to be a ret before the final end
+                  if(tokens[i + 1].p_type == END && val_stack[stack_head - 1]->p_type == FUNC){
+                     func_info = search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func;
+                     func_info->has_return = 1;
+                  }
                }
             }
          break;
          case CALL:
             // Verify number of arguments
-            int size = 0;
-            ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
+            size = 0;
+            func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
             if(tokens[i + 2].p_type != PAREN_CLOSE){
-               int j = i + 2;
+               j = i + 2;
                size = 1;
                while(tokens[j].p_type != PAREN_CLOSE){
                   if(tokens[j].p_type == EXPR_SEP) size++;
@@ -243,22 +262,67 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             // push function to stack
             val_stack[stack_head++] = curr;
          break;
+
+         case RETURN:
+            // Search Call stack for function
+            for(j = stack_head - 1; j >= 0; j--){
+               if(val_stack[j]->p_type == FUNC){ // This is garanteed to happen once
+                  log_msg("FOUND FUNCTION INFO");
+                  func_info = search_rmap(&env->funcs, val_stack[j]->as.word)->as.func;
+                  break;
+               }
+            }
+
+            if(func_info->return_type != SHM_NONE && tokens[i + 1].p_type == LINE_SEP){
+               token_errorf("The current function expects value to be returned", curr);
+               return -1;
+            }else if(func_info->return_type == SHM_NONE && tokens[i + 1].p_type != LINE_SEP){
+               token_errorf("The current function expects no values to be returned", curr);
+               return -1;
+            }
+
+            if(func_info->return_type == SHM_NONE){
+               runnable[op_index++] = to_rtoken(curr);
+            }else{
+               val_stack[stack_head++] = curr; // Push to the stack 
+            }
+
+         break;
+
          case EXPR_SEP:
             // if , is seen flush the expression
-            expression_flush(runnable, &op_index);
+            expression_flush_parens(runnable, &op_index);
          break;
          case PAREN_OPEN:
+            // if(stack_head > 0 && val_stack[stack_head - 1]->p_type != CALL){
+               log_msg("EXPRESSION PAREN OPEN");
+               expression_push(curr, runnable, &op_index, &env->variables);
+            // }
          break;
          case PAREN_CLOSE:
             // once ) is reached pop function from stack
-            if(val_stack[stack_head - 1]->p_type == CALL){
-               if(search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func->num_args > 0){
-                  expression_flush(runnable, &op_index);
+            if(stack_head > 0 && val_stack[stack_head - 1]->p_type == CALL){
+               func_info = search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func;
+               if(func_info->num_args > 0){
+                  expression_flush_parens(runnable, &op_index);
+                  
                }
                runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                stack_head--;
+
+               // If there is a return type. use it
+               if(func_info->return_type != SHM_NONE){
+                  log_msg("FUNCTION CALL HAS RETURN");
+                  if(expression.line == -1){
+                     expression.type = func_info->return_type;
+                     expression.line = curr->line;
+                     log_int("EXPRESSION LINE", curr->line);
+                  }
+                  expression.types[expression.types_head++] = func_info->return_type == SHM_DBL; // For the time being it is only ints and floats
+               }
             }else{
-               token_errorf("Paren Close is not supported for non CALL type", val_stack[stack_head - 1]);
+               log_msg("EXPRESSION PAREN CLOSE");
+               expression_push(curr, runnable, &op_index, &env->variables);
             }
 
          break;
@@ -316,6 +380,11 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                memcpy(func_info->tokens, runnable + func_info->num_tokens, func_size * sizeof(RToken));
                func_info->num_tokens = func_size;
 
+               if(func_info->return_type != SHM_NONE && func_info->has_return == 0){
+                  token_errorf("This function expects a return to be on the line before this one", curr);      
+                  return -1;
+               }
+
                // Exit scope
                end_scope();
 
@@ -354,7 +423,7 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
    }
 
    if(tkn->p_type == WORD || OP_MASK(tkn->p_type) == NUMBER){
-      log_msg("EXPRESSION PUSH VALUE");
+      log_str("EXPRESSION PUSH", OP_MASK(tkn->p_type) == NUMBER ? "NUMBER" : "WORD");
       if(OP_MASK(tkn->p_type) == NUMBER){
          expression.types[expression.types_head] = NUMBER_IS_FLT(tkn->p_type);
       }else{
@@ -375,8 +444,24 @@ void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *m
       }
 
       expression.types_head++;
+      log_ptoken("PUSHING", tkn);
       runnable[*num_run_tokens] = to_rtoken(tkn);
       *num_run_tokens = *num_run_tokens + 1;
+   }else if(tkn->p_type == PAREN_OPEN){
+      log_msg("PUSHING PAREN OPEN");
+      log_int("EXPRESSION SIZE", expression.size);
+      expression.stack[expression.size++] = tkn;
+   }else if(tkn->p_type == PAREN_CLOSE){
+      log_msg("POPPING TILL PAREN OPEN");
+      while(expression.size > 0 && expression.stack[expression.size - 1]->p_type != PAREN_OPEN){
+         runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
+
+         encode_operand(&runnable[*num_run_tokens]);
+
+         *num_run_tokens = *num_run_tokens + 1;
+         expression.size -= 1;
+      }
+      expression.size -= 1;
    }else{
       log_msg("EXPRESSION PUSH OPERAND");
       while(expression.size > 0 && op_prec(tkn->p_type) <= op_prec(expression.stack[expression.size - 1]->p_type)){
@@ -395,35 +480,35 @@ ShmType expression_type(){
    return expression.type;
 }
 
-int expression_flush(RToken *runnable, int *num_run_tokens){
-   log_msg("EXPRESSION FLUSH");
+int expression_flush_parens(RToken *runnable, int *num_run_tokens){
+   log_msg("EXPRESSION PAREN FLUSH");
    int tmp = expression.line;
    if(expression.line == -1){
       return 0;
    }
 
-   expression.line = -1;
-   while(expression.size > 0){
-      
-      runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
-      encode_operand(&runnable[*num_run_tokens]);
+   int open_parens = 0;
 
-      *num_run_tokens = *num_run_tokens + 1;
+   while(expression.size > 0 && open_parens >= 0){
+      if(expression.stack[expression.size - 1]->p_type == PAREN_OPEN){
+         open_parens--;
+      }else if(expression.stack[expression.size - 1]->p_type == PAREN_CLOSE){
+         open_parens++;
+      }else{
+         runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
+         encode_operand(&runnable[*num_run_tokens]);
+         *num_run_tokens = *num_run_tokens + 1;
+      }
+
       expression.size -= 1;
    }
-   if(expression.first_op == 1){
-      runnable[*num_run_tokens] = (RToken){
-         .r_type = PUSH_SHM,
-      };
-      *num_run_tokens = *num_run_tokens + 1;
+
+   expression.type = expression.types[expression.types_head - 1] ? SHM_DBL : SHM_INT;
+   if(expression.size == 0){
+      expression.line = -1;
+      expression.types_head = 0;
    }
 
-   if(expression.types_head > 0){
-      expression.type = expression.types[expression.types_head - 1] ? SHM_DBL : SHM_INT;
-   }
-
-   expression.types_head = 0;
-   expression.first_op = 0;
 
    return tmp;
 }
@@ -502,11 +587,17 @@ const char *rtoken_str(const RToken *rtoken){
       case END:
          sprintf(_buffer, "End");
       break;
+      case RETURN:
+         sprintf(_buffer, "Return");
+      break;
       case CALL:
          sprintf(_buffer, "Call(%s)", rtoken->as.word);
       break;
       case DEL_VAR:
          sprintf(_buffer, "Del(%s)", rtoken->as.word);
+      break;
+      default:
+        return "Unimplemented RToken";
       break;
    }
 
@@ -634,6 +725,7 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
    int found = func_wrapper != NULL;
    log_str("FUNCTION", found ? "FOUND" : "NOT FOUND");
    ShmFunc *function;
+   ShmType return_type = SHM_NONE;
 
    // get number of args
    int num_args = 0;
@@ -649,6 +741,16 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
    }
 
    log_int("FUNCTION ARGS FOUND", num_args);
+   if(tokens[start + offset + 1].p_type == ARROW){
+      return_type = conv_to_shm(tokens[start + offset + 2].p_type);
+
+      // Confirm type is not null
+      if(return_type == SHM_NULL){
+         log_msg("ERROR: Unable to convert type to shmtype");
+         token_errorf("Unknown ShmType %s found in function header", &tokens[start + offset + 2], ptoken_str(&tokens[start + offset + 2]));
+         return 1;
+      }
+   }
 
    if(found){
       // check if the number of args are the same
@@ -658,11 +760,19 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
          token_errorf("Found duplicate function header that does not have the same number of args as the original, found %d expected %d", &tokens[i + 1], num_args, function->num_args);
          return 1;
       }
+
+      if(function->return_type != return_type){
+         log_msg("ERROR: Function Return Type");
+         token_errorf("Found duplicate function header that does not have the same return type as the original, found %s expected %s", &tokens[i + 1], shm_type_str(return_type), shm_type_str(function->return_type));
+         return 1;
+      }
    }else{
       function = calloc(1, sizeof(ShmFunc));
       function->num_args = num_args;
+      function->return_type = return_type;
       insert_rmap(&env->funcs, tokens[start + 1].as.word, SHM_FUNC, (MultiVal){.func = function});
       log_msg("MEMROY: Allocating New Function");
+      log_str("FUNCTION RETURN TYPE", shm_type_str(return_type));
    }
 
    if(!is_proto){
@@ -760,6 +870,9 @@ ShmType conv_to_shm(TokenType type){
       case TYPE_FLOAT:
          return SHM_DBL;
       break;
+      case TYPE_NONE:
+         return SHM_NONE;
+      break;
       default:
       break;
    }
@@ -770,6 +883,7 @@ void log_function(const ShmFunc *func_info){
    log_str("FUNCTION", func_info->func_name);
    log_int("NUMBER TOKENS", func_info->num_tokens);
    log_int("NUMBER ARGS", func_info->num_args);
+   log_str("RETURN TYPE", shm_type_str(func_info->return_type));
    for(int i = 0; i < func_info->num_args; ++i){
       log_str("ARG", func_info->args[i]);
       log_str("TYPE", shm_type_str(func_info->types[i]));

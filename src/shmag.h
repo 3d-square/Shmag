@@ -35,10 +35,14 @@ typedef enum {
    PROTO_FUNC,
    EXPR_SEP,
    DEL_VAR,
+   RETURN,
 
    /* Types */
    TYPE_INT,
-   TYPE_FLOAT
+   TYPE_FLOAT,
+   TYPE_NONE,
+
+   ARROW
 } TokenType;
 
 #define OP_MASK(op) (op & 0xFFFF)
@@ -53,6 +57,9 @@ typedef enum {
 
 #define WORD_DBL 0x80000000
 #define WORD_IS_DBL(op) ((op & WORD_DBL) && 1)
+
+#define SET_RET_INDEX 0x80000000
+#define RET_IS_SET(ret) ((ret & SET_RET_INDEX) && 1)
 
 typedef struct _shm_func ShmFunc;
 
@@ -69,6 +76,7 @@ typedef enum {
    SHM_DBL,
    SHM_INT,
    SHM_STR,
+   SHM_NONE,
    SHM_FUNC,
    SHM_NULL,
 } ShmType;
@@ -94,10 +102,12 @@ typedef struct  _shm_func{
    char *func_name;
    int num_args;
    char **args;
+   ShmType return_type;
    ShmType *types;
    RToken *tokens;
+   int has_return; /* doubles as return value */
    int num_tokens;
-   int initialized;
+   int initialized; 
 } ShmFunc;
 
 typedef struct node {

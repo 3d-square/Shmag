@@ -1,0 +1,10 @@
+func add( int i1, int i2 )
+   . i1 + i2
+end
+func addflt( float i1, float i2 )
+   . i1 + i2
+end
+
+
+addflt(11.0, 10.)
+add(12,13)
