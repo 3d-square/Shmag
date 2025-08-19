@@ -50,9 +50,8 @@ static struct {
    int size;
    int capacity;
    int line;
-   int first_op;
    ShmType type;
-} expression = {.types_head = 0, .capacity = 100, .size = 0, .line = -1, .first_op = 0};
+} expression = {.types_head = 0, .capacity = 100, .size = 0, .line = -1};
 
 struct typed_word{
    const char *word;
@@ -86,6 +85,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
    int stack_head = 0;
    int expr_line = 0;
    int size;
+   int j;
    
    for(int i = 0; i < num_tokens; ++i){
       log_msg("");
@@ -188,7 +188,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             expr_line = curr->line;
          break;
          case LINE_SEP:
-            if((expr_line = expression_flush(runnable, &op_index)) != 0){
+            if((expr_line = expression_flush_parens(runnable, &op_index)) != 0){
                if(val_stack[stack_head - 1]->p_type == SET_WORD){
                   runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                   if(expression_type() == SHM_DBL){
@@ -227,6 +227,16 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                   }
                   op_index++;
                   stack_head--;
+               }else if(val_stack[stack_head - 1]->p_type == RETURN){
+                  runnable[op_index++] = (RToken){
+                     .r_type = RETURN | SET_RET_INDEX,
+                  };
+
+                  // Check if next token is END. There always has to be a ret before the final end
+                  if(tokens[i + 1].p_type == END && val_stack[stack_head - 1]->p_type == FUNC){
+                     func_info = search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func;
+                     func_info->has_return = 1;
+                  }
                }
             }
          break;
@@ -235,7 +245,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             size = 0;
             func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
             if(tokens[i + 2].p_type != PAREN_CLOSE){
-               int j = i + 2;
+               j = i + 2;
                size = 1;
                while(tokens[j].p_type != PAREN_CLOSE){
                   if(tokens[j].p_type == EXPR_SEP) size++;
@@ -250,22 +260,48 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             // push function to stack
             val_stack[stack_head++] = curr;
          break;
+
+         case RETURN:
+            // Search Call stack for function
+            for(j = stack_head - 1; j >= 0; j--){
+               if(val_stack[j]->p_type == CALL){ // This is garanteed to happen once
+                  func_info = search_rmap(&env->funcs, val_stack[j]->as.word)->as.func;
+               }
+            }
+
+            if(func_info->return_type != SHM_NONE && tokens[i + 1].p_type == LINE_SEP){
+               token_errorf("The current function expects value to be returned", curr);
+               return -1;
+            }else if(func_info->return_type == SHM_NONE && tokens[i + 1].p_type != LINE_SEP){
+               token_errorf("The current function expects no values to be returned", curr);
+               return -1;
+            }
+
+            if(func_info->return_type == SHM_NONE){
+               runnable[op_index++] = to_rtoken(curr);
+            }else{
+               val_stack[stack_head++] = curr; // Push to the stack 
+            }
+
+         break;
+
          case EXPR_SEP:
             // if , is seen flush the expression
-            expression_flush(runnable, &op_index);
+            expression_flush_parens(runnable, &op_index);
          break;
          case PAREN_OPEN:
-            if(stack_head > 0 && val_stack[stack_head - 1]->p_type != CALL){
+            // if(stack_head > 0 && val_stack[stack_head - 1]->p_type != CALL){
                log_msg("EXPRESSION PAREN OPEN");
                expression_push(curr, runnable, &op_index, &env->variables);
-            }
+            // }
          break;
          case PAREN_CLOSE:
             // once ) is reached pop function from stack
             if(stack_head > 0 && val_stack[stack_head - 1]->p_type == CALL){
                func_info = search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func;
                if(func_info->num_args > 0){
-                  expression_flush(runnable, &op_index);
+                  expression_flush_parens(runnable, &op_index);
+                  
                }
                runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                stack_head--;
@@ -339,6 +375,11 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                // copy function ops into function tokens
                memcpy(func_info->tokens, runnable + func_info->num_tokens, func_size * sizeof(RToken));
                func_info->num_tokens = func_size;
+
+               if(func_info->return_type != SHM_NONE && func_info->has_return == 0){
+                  token_errorf("This function expects a return to be on the line before this one", curr);      
+                  return -1;
+               }
 
                // Exit scope
                end_scope();
@@ -435,34 +476,6 @@ ShmType expression_type(){
    return expression.type;
 }
 
-int expression_flush(RToken *runnable, int *num_run_tokens){
-   log_msg("EXPRESSION FLUSH");
-   int tmp = expression.line;
-   if(expression.line == -1){
-      return 0;
-   }
-
-   expression.line = -1;
-   while(expression.size > 0){
-      
-      runnable[*num_run_tokens] = to_rtoken(expression.stack[expression.size - 1]);
-      encode_operand(&runnable[*num_run_tokens]);
-
-      *num_run_tokens = *num_run_tokens + 1;
-      expression.size -= 1;
-   }
-
-   if(expression.types_head > 0){
-      expression.type = expression.types[expression.types_head - 1] ? SHM_DBL : SHM_INT;
-   }
-
-   expression.types_head = 0;
-   expression.first_op = 0;
-
-   return tmp;
-}
-
-
 int expression_flush_parens(RToken *runnable, int *num_run_tokens){
    log_msg("EXPRESSION PAREN FLUSH");
    int tmp = expression.line;
@@ -472,7 +485,7 @@ int expression_flush_parens(RToken *runnable, int *num_run_tokens){
 
    int open_parens = 0;
 
-   while(expression.size > 0 && open_parens > 0){
+   while(expression.size > 0 && open_parens >= 0){
       if(expression.stack[expression.size - 1]->p_type == PAREN_OPEN){
          open_parens--;
       }else if(expression.stack[expression.size - 1]->p_type == PAREN_CLOSE){
@@ -486,12 +499,12 @@ int expression_flush_parens(RToken *runnable, int *num_run_tokens){
       expression.size -= 1;
    }
 
-   if(expression.types_head > 0){
-      expression.type = expression.types[expression.types_head - 1] ? SHM_DBL : SHM_INT;
+   expression.type = expression.types[expression.types_head - 1] ? SHM_DBL : SHM_INT;
+   if(expression.size == 0){
+      expression.line = -1;
+      expression.types_head = 0;
    }
 
-   expression.types_head = 0;
-   expression.first_op = 0;
 
    return tmp;
 }
@@ -569,6 +582,9 @@ const char *rtoken_str(const RToken *rtoken){
       break;
       case END:
          sprintf(_buffer, "End");
+      break;
+      case RETURN:
+         sprintf(_buffer, "Return");
       break;
       case CALL:
          sprintf(_buffer, "Call(%s)", rtoken->as.word);

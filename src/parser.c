@@ -66,6 +66,8 @@ void set_word_type(PToken *token){
       token->p_type = EXPR_SEP;
    }else if(strcmp(token->as.word, "int") == 0){
       token->p_type = TYPE_INT;
+   }else if(strcmp(token->as.word, "return") == 0){
+      token->p_type = RETURN;
    }else if(strcmp(token->as.word, "float") == 0){
       token->p_type = TYPE_FLOAT;
    }else if(strcmp(token->as.word, "none") == 0){
@@ -279,6 +281,9 @@ const char *ptoken_str(const PToken *ptoken){
       break;
       case TYPE_NONE:
          sprintf(_buffer, "TypeNone");
+      break;
+      case RETURN:
+         sprintf(_buffer, "Return");
       break;
       case ARROW:
          sprintf(_buffer, "Arrow");

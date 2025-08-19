@@ -14,7 +14,8 @@ void log_start(){
    time_t t = time(NULL);
 
    struct tm time_struct = *localtime(&t);
-   sprintf(file_name, "LOG_%d-%02d-%02d_%02d%02d%02d", time_struct.tm_year + 1900, time_struct.tm_mon + 1, time_struct.tm_mday, time_struct.tm_hour, time_struct.tm_min, time_struct.tm_sec);
+   // sprintf(file_name, "LOG_%d-%02d-%02d_%02d%02d%02d", time_struct.tm_year + 1900, time_struct.tm_mon + 1, time_struct.tm_mday, time_struct.tm_hour, time_struct.tm_min, time_struct.tm_sec);
+   sprintf(file_name, "LOG");
    _log = fopen(file_name, "w");
 
    if(_log == NULL){

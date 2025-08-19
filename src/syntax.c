@@ -30,6 +30,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
    TokenType nested[256];
    int num_nested = 0;
    int parens_open = 0;
+   int in_function = 0;
 
    while(i < num_tokens){
       const PToken *curr_token = &tokens[i++];
@@ -161,6 +162,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
             if(curr_token->p_type == FUNC){
                log_msg("FUNCTION BLOCK");
                nested[num_nested++] = curr_token->p_type;
+               in_function = 1;
             }
 
             if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD)){
@@ -177,6 +179,19 @@ int validate_syntax(PToken *tokens, int num_tokens){
             }
 
          break;
+   
+         case RETURN:
+            if(in_function != 1){
+               token_errorf("Return found outside of function", curr_token);
+               error = 1;
+            }
+      
+            if(!expect_type(tokens, i, E_LINE | E_WORD | E_VALUE | E_OPEN)){
+               token_errorf("Found invalid return argument in function. Expected a newline, word, value, or expression", curr_token);
+               error = 1;
+            }
+         break;
+
          case PAREN_OPEN:
             parens_open++;
             if(func_header == 1){

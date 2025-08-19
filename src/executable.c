@@ -16,6 +16,9 @@ int execute_runnable(REnv *env, RToken *runnable, int runnable_len){
 
 int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head){
    log_str("CALLING", func->func_name);
+
+   // to support recursion save off the values of the previous variables and return index
+   
    // Push Arguments to the variables
    for(int i = 0; i < func->num_args; ++i){
       log_str("SET VARIABLE", func->args[i]);
@@ -24,15 +27,26 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
    }
    int status = execute_tokens(env, stack + *stack_head, func->tokens, func->num_tokens);
 
+   if(status < 0) exit(-1);
+
    log_msg("CLEANING UP FUNCTION CALL");
    // Pop args on the stack
    for(int i = 0; i < func->num_args; ++i){
       log_str("DELETE", func->args[i]);
       delete_rmap(&env->variables, func->args[i], NULL);
    }
+
    log_msg("RESET STACK");
    *stack_head = *stack_head - func->num_args;
+
+   if(func->return_type != SHM_NONE){
+      log_msg("SAVING RETURN");
+      stack[*stack_head] = stack[status];
+      *stack_head = *stack_head + 1;
+   }
+
    log_int("STACK HEAD", *stack_head);
+
    log_msg("END FUNCTION CALL");
 
    return status;
@@ -95,6 +109,12 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          case CALL:
             ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
             execute_function(env, func_info, stack, &stack_head);
+         break;
+         case RETURN:
+            if(RET_IS_SET(curr->r_type)){
+               return stack_head;
+            }
+            return 0;
          break;
          case DEL_VAR:
             delete_rmap(&env->variables, curr->as.word, NULL);
