@@ -1,0 +1,5 @@
+func addiflt ( int i1, float i2 )
+   . i2 + i1 + i2 / i1
+end
+
+addiflt(5, 10.)

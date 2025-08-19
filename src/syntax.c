@@ -13,6 +13,7 @@ enum expected_types{
    E_OPEN  = 1 << 5,
    E_CLOSE = 1 << 6,
    E_TYPE  = 1 << 7,
+   E_ARROW = 1 << 8,
 };
 
 int expect_type(const PToken *tokens, int index, int types);
@@ -28,6 +29,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
    int func_call = 0;
    TokenType nested[256];
    int num_nested = 0;
+   int parens_open = 0;
 
    while(i < num_tokens){
       const PToken *curr_token = &tokens[i++];
@@ -40,7 +42,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
          case SET:
             log_msg("SET_WORD");
-            if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
+            if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE | E_OPEN)){
                token_errorf("Set operator expects a WORD or VALUE after the ':='", curr_token);
                error = 1;
             }
@@ -77,7 +79,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
                token_errorf("dump expects tokens to follow", curr_token);
                error = 1;
             }
-            if(!error && !expect_type(tokens, i, E_WORD | E_VALUE)){
+            if(!error && !expect_type(tokens, i, E_WORD | E_VALUE | E_OPEN)){
                token_errorf("Cannot print type", &tokens[i]);
                error = 1;
             }
@@ -135,6 +137,11 @@ int validate_syntax(PToken *tokens, int num_tokens){
          break;
 
          case LINE_SEP:
+            if(parens_open != 0){
+               token_errorf("Found mismatched ) and (", curr_token);
+               error = 1;
+            }
+            parens_open = 0;
          break;
 
          case TYPE_INT:
@@ -171,65 +178,61 @@ int validate_syntax(PToken *tokens, int num_tokens){
 
          break;
          case PAREN_OPEN:
+            parens_open++;
             if(func_header == 1){
                log_msg("FUNCTION ARGS");
                if(i >= num_tokens || !expect_type(tokens, i, E_TYPE | E_CLOSE)){
                   token_errorf("Type or ')' expected after '('", curr_token);
                   error = 1;
-               }else{
-                  // Check from closing paren
-                  int j = i;
-                  int nested_paren = 1;
-                  while(j < num_tokens && tokens[j].p_type != LINE_SEP){
-                     if(tokens[j].p_type == PAREN_OPEN) nested_paren++;
-                     else if(tokens[j].p_type == PAREN_CLOSE) nested_paren--;
-                     j++;
-                  }
-
-                  if(nested_paren != 0){
-                     token_errorf("Mismatched number of '(' and ')' on the same line\n", curr_token);
-                     error = 1;
-                  }
                }
             }else if(i > 1 && expect_type(tokens, i - 2, E_WORD)){ // function call
                log_msg("FUNCTION CALL");
-               if(i >= num_tokens || !expect_type(tokens, i, E_TYPE| E_CLOSE | E_VALUE)){
-                  token_errorf("Type or ')' expected after '('", curr_token);
+               if(i >= num_tokens || !expect_type(tokens, i, E_CLOSE | E_VALUE | E_OPEN)){
+                  token_errorf("Type or ')' or expression expected after '('", curr_token);
                   error = 1;
                }else{
-                  // Check from closing paren
-                  int j = i;
-                  int nested_paren = 1;
-                  while(j < num_tokens && tokens[j].p_type != LINE_SEP){
-                     if(tokens[j].p_type == PAREN_OPEN) nested_paren++;
-                     else if(tokens[j].p_type == PAREN_CLOSE) nested_paren--;
-                     j++;
-                  }
-
-                  if(nested_paren != 0){
-                     token_errorf("Mismatched number of '(' and ')' on the same line\n", curr_token);
-                     error = 1;
-                  }
                   tokens[i - 2].p_type = CALL;
                   func_call = 1;
                }
-            }else{
-               token_errorf("Parentheses are not currently supported outside of functions calls", curr_token);
-               error = 1;
+            }else{ // ( is part of an expression
+               log_msg("EXPRESSION OPEN PAREN");
+               if(!expect_type(tokens, i, E_WORD | E_VALUE | E_OPEN)){
+                  token_errorf("( in expression needs to be followed by a word or number", curr_token);
+                  error = 1;
+               }
             }
          break;
          // Checked for in paren open
          case PAREN_CLOSE:
+            parens_open--;
+            if(parens_open < 0){
+               token_errorf("Found more ) than (", curr_token);
+               error = 1;
+            }
             if(func_header == 1){
+               if(!expect_type(tokens, i, E_ARROW | E_LINE)){
+                  token_errorf("End of function header is either newline or '->' 'type'", curr_token);
+                  error = 1;
+               }
                log_msg("END FUNCTION ARGS");
                func_header = 0;
             }else if(func_call == 1){
                log_msg("END FUNCTION CALL");
                func_call = 0;
             }else{
-               token_errorf("Parentheses are not currently supported outside of functions calls", curr_token);
+               log_msg("EXPRESSION CLOSE PAREN");
+               if(!expect_type(tokens, i, E_OP | E_LINE | E_CLOSE)){
+                  token_errorf("Closing Parenthese in expression expects operand or expression end", curr_token);
+                  error = 1;
+               }
+            }
+         break;
+         case ARROW:
+            if(!expect_type(tokens, i, E_TYPE)){
+               token_errorf("End of function header with '->' is a type", curr_token);
                error = 1;
             }
+            i++;
          break;
          case EXPR_SEP:
             log_msg("SEPERATE EXPRESSIONS");
@@ -263,6 +266,11 @@ int validate_syntax(PToken *tokens, int num_tokens){
       }
       if(error) return -1;
       // printf("%s: %d\n", ptoken_str(curr_token), num_nested);
+   }
+
+   if(parens_open != 0){
+      perror("Found mismatched ) and (");
+      return -1;
    }
    
    if(num_nested > 0){
@@ -335,9 +343,20 @@ int expect_type(const PToken *tokens, int index, int types){
       if(tokens[index].p_type == PAREN_CLOSE) return 1;
    }
 
+   if(types & E_ARROW){
+      if(tokens[index].p_type == ARROW) return 1;
+   }
+
    if(types & E_TYPE){
-      if(tokens[index].p_type == TYPE_INT) return 1;
-      if(tokens[index].p_type == TYPE_FLOAT) return 1;
+      switch(tokens[index].p_type){
+         case TYPE_INT:
+         case TYPE_FLOAT:
+         case TYPE_NONE:
+            return 1;
+         break;
+         default:
+         break;
+      }
    }
 
    return 0;

@@ -38,7 +38,10 @@ typedef enum {
 
    /* Types */
    TYPE_INT,
-   TYPE_FLOAT
+   TYPE_FLOAT,
+   TYPE_NONE,
+
+   ARROW
 } TokenType;
 
 #define OP_MASK(op) (op & 0xFFFF)
@@ -69,6 +72,7 @@ typedef enum {
    SHM_DBL,
    SHM_INT,
    SHM_STR,
+   SHM_NONE,
    SHM_FUNC,
    SHM_NULL,
 } ShmType;
@@ -94,6 +98,7 @@ typedef struct  _shm_func{
    char *func_name;
    int num_args;
    char **args;
+   ShmType return_type;
    ShmType *types;
    RToken *tokens;
    int num_tokens;

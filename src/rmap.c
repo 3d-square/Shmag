@@ -123,8 +123,10 @@ const char *shm_type_str(ShmType type){
          return "String";
       case SHM_FUNC:
          return "Function";
-      case SHM_NULL:
+      case SHM_NONE:
          return "None";
+      case SHM_NULL:
+         return "Unimplemented";
    }
 
    return NULL;
