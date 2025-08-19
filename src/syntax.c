@@ -62,17 +62,18 @@ int validate_syntax(PToken *tokens, int num_tokens){
          case MULT:
          case DIV:
             log_msg("OPERATION");
-             // Check rhs
-             if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE)){
+
+            // check lhs
+            if(i < 2 || !expect_type(tokens, i - 2, E_WORD | E_VALUE | E_CLOSE)){
+               token_errorf("WORD or VALUE expected before operator", curr_token);
+               error = 1;
+            }
+            // Check rhs
+            if(i >= num_tokens || !expect_type(tokens, i, E_WORD | E_VALUE | E_OPEN)){
                token_errorf("WORD or VALUE expected after operator", curr_token);
                error = 1;
             }
 
-            // check lhs
-            if(i < 2 || !expect_type(tokens, i - 2, E_WORD | E_VALUE)){
-               token_errorf("WORD or VALUE expected before operator", curr_token);
-               error = 1;
-            }
          break;
          case DUMP:
             log_msg("DUMP");

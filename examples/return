@@ -5,3 +5,5 @@ func add(int i1, int i2) -> int
 end
 
 . add(12, 15)
+
+. add(1,1) + 2
