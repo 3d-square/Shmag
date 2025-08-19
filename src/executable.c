@@ -37,13 +37,14 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
    }
 
    log_msg("RESET STACK");
-   *stack_head = *stack_head - func->num_args;
 
    if(func->return_type != SHM_NONE){
       log_msg("SAVING RETURN");
-      stack[*stack_head] = stack[status];
+      stack[*stack_head - func->num_args] = stack[*stack_head + status];
       *stack_head = *stack_head + 1;
    }
+
+   *stack_head = *stack_head - func->num_args;
 
    log_int("STACK HEAD", *stack_head);
 
@@ -73,6 +74,7 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          case MOD:
             perform_shm_operation(curr->r_type, &stack[stack_head - 2], stack[stack_head - 1]);
             stack_head--;
+            log_int("STACK HEAD", stack_head);
          break;
          case SET_WORD:
             ShmType word_type = WORD_IS_DBL(curr->r_type) ? SHM_DBL : SHM_INT;
@@ -112,7 +114,8 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          break;
          case RETURN:
             if(RET_IS_SET(curr->r_type)){
-               return stack_head;
+               log_int("SAVING RETURN IN", stack_head);
+               return stack_head - 1;
             }
             return 0;
          break;
@@ -170,6 +173,7 @@ void perform_shm_operation(TokenType op, MultiVal *lhs, MultiVal rhs){
             fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
+      log_float("RESULT", lhs->number);
    }else if(LHS_IS_DBL(op)){
       log_msg("FLOAT + INT");
       log_float("LHS", lhs->number);
@@ -204,6 +208,7 @@ void perform_shm_operation(TokenType op, MultiVal *lhs, MultiVal rhs){
             fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
+      log_float("RESULT", lhs->number);
    }else if(RHS_IS_DBL(op)){
       log_msg("INT + FLOAT");
       log_int("LHS", lhs->decimal);
@@ -237,6 +242,7 @@ void perform_shm_operation(TokenType op, MultiVal *lhs, MultiVal rhs){
          default:
             exit(1);
       }
+      log_float("RESULT", lhs->number);
    }else{
       log_msg("INT + INT");
       log_int("LHS", lhs->decimal);
@@ -270,6 +276,7 @@ void perform_shm_operation(TokenType op, MultiVal *lhs, MultiVal rhs){
             fprintf(stderr, "Invalid Operand\n");
             exit(1);
       }
+      log_int("RESULT", lhs->decimal);
    }
 }
 

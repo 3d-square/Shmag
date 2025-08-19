@@ -4,4 +4,4 @@ func add(int i1, int i2) -> int
    return (i1 + i2)
 end
 
-add(12, 15)
+. add(12, 15)

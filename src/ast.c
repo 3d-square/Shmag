@@ -232,6 +232,8 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                      .r_type = RETURN | SET_RET_INDEX,
                   };
 
+                  stack_head--;
+
                   // Check if next token is END. There always has to be a ret before the final end
                   if(tokens[i + 1].p_type == END && val_stack[stack_head - 1]->p_type == FUNC){
                      func_info = search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func;
@@ -264,8 +266,10 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          case RETURN:
             // Search Call stack for function
             for(j = stack_head - 1; j >= 0; j--){
-               if(val_stack[j]->p_type == CALL){ // This is garanteed to happen once
+               if(val_stack[j]->p_type == FUNC){ // This is garanteed to happen once
+                  log_msg("FOUND FUNCTION INFO");
                   func_info = search_rmap(&env->funcs, val_stack[j]->as.word)->as.func;
+                  break;
                }
             }
 
