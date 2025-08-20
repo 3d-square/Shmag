@@ -11,8 +11,20 @@ class AssertTest {
 
    }
 
-   // void assert_eq();
-   // void assert_constains();
+   template <typename T>
+   void equals(const T &arg1, const T &arg2){
+      res = arg1 == arg2 && res;
+   }
+
+   template <typename T>
+   void not_equals(const T &arg1, const T &arg2){
+      res = arg1 != arg2 && res;
+   }
+
+   void contains(const std::string &str, const std::string &substr){
+      bool contains = str.find(substr) != std::string::npos;
+      res = contains && res;
+   }
    
    void reset(){
       res = true;
@@ -23,14 +35,30 @@ class AssertTest {
    }
 };
 
-class AutoTest {
+class AutoTypeNull{
+   
+};
+
+template <typename A>
+class AutoTest{
    int passed;
+   std::function<A()> setup_func;
+   std::function<void(A&)> cleanup_func;
+   A dep;
    AssertTest res;
-   std::vector< std::function< bool(AssertTest &) > > tests;
+   std::vector< std::function< bool(AutoTest<A> &, AssertTest &) > > tests;
 
  public:
    AutoTest() : passed(0) {
       std::cout << "Built Test Object" << std::endl;
+   }
+
+   AutoTest(std::function<A()> func) : passed(0), setup_func(func){
+      std::cout << "Built Test Object With a Setup Function" << std::endl;
+   }
+
+   AutoTest(std::function<A()> setup, std::function<void(A&)> cleanup) : passed(0), setup_func(setup), cleanup_func(cleanup){
+      std::cout << "Built Test Object With a Setup Function" << std::endl;
    }
 
    void run_all(){
@@ -38,7 +66,8 @@ class AutoTest {
       int i = 0;
       for(auto test : tests){
          i++;
-         bool result = test(res);
+         
+         bool result = test(*this , res);
          
          std::cout << "Test " << i << " - " << (result ? "PASSED" : "FAILED") << std::endl;
 
@@ -51,23 +80,41 @@ class AutoTest {
       std::cout << "Tests Passed " << passed << "/" << tests.size() << std::endl;
    }
 
-   AutoTest &add_test(std::function< bool(AssertTest &) > testCase){
+   AutoTest &add_test(std::function< bool(AutoTest<A> &, AssertTest &) > testCase){
       tests.push_back(testCase);
       return *this;
    }
+
+   void setup(){
+      if(setup_func){
+         dep = setup_func();
+      }
+   }
+
+   void cleanup(){
+      if(cleanup_func){
+         cleanup_func(dep);
+      }
+   }
+
+   A &get_val(){
+      return dep;
+   }
 };
 
-#define TEST_CASE(bdy) [](AssertTest &ass){\
+#define TEST_CASE(type, bdy) [](AutoTest<type> &obj, AssertTest &assert){\
+   obj.setup(); \
    bdy \
-return ass.result();\
+   obj.cleanup(); \
+return assert.result();\
 }
 
 int main(){
-   AutoTest tests;
+   AutoTest<AutoTypeNull> tests;
 
-   tests.add_test(TEST_CASE({
-      std::cout << "Test 1" << std::endl;
-   })).add_test(TEST_CASE({
-      std::cout << "Test 2" << std::endl;
+   tests.add_test(TEST_CASE(AutoTypeNull, {
+      assert.not_equals<int>(1, 1);
+   })).add_test(TEST_CASE(AutoTypeNull, {
+      assert.equals<int>(1, 1);
    })).run_all();
 }
