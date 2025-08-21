@@ -1,3 +1,4 @@
 src/*.o
 shmag
 LOG*
+auto_tests

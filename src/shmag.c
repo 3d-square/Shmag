@@ -81,22 +81,18 @@ int main(int argc, char **argv){
       parse_as_tokens(buffer, tokens, &num_tokens);
 
       if(validate_syntax(tokens, num_tokens) != -1){
-         printf("Syntax Validated\n");
-         // print_im(tokens, num_tokens);
          if(build_runnable(tokens, num_tokens, &env, runnable, &runnable_len) != -1){
-            printf("Executable was built\n\n");
             log_executable(argv[1], runnable, runnable_len);
             execute_runnable(&env, runnable, runnable_len);
             destroy_rmap(&env.funcs, free_shm_function);
             free_rtokens(runnable, runnable_len);
          }else{
-            printf("Unable to create an executable\n");
+            return 1;
          }
       }else{
-         printf("Unable to validate syntax\n");
+         return 1;
       }
       log_stop();
-     
    }
 
    return 0;
