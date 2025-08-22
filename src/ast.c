@@ -730,7 +730,6 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
    // get number of args
    int num_args = 0;
    int offset = 3;
-   int i = 0;
 
    /* func name ( arg )
  *     0    1   2  3  4
@@ -755,21 +754,37 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
    if(found){
       // check if the number of args are the same
       function = func_wrapper->as.func;
+      int error = 0;
       if(function->num_args != num_args){
          log_msg("ERROR: Function Arg Mismatch");
-         token_errorf("Found duplicate function header that does not have the same number of args as the original, found %d expected %d", &tokens[i + 1], num_args, function->num_args);
+         token_errorf("Found duplicate function header that does not have the same number of args as the original, found %d expected %d", &tokens[start + 1], num_args, function->num_args);
          return 1;
       }
 
       if(function->return_type != return_type){
          log_msg("ERROR: Function Return Type");
-         token_errorf("Found duplicate function header that does not have the same return type as the original, found %s expected %s", &tokens[i + 1], shm_type_str(return_type), shm_type_str(function->return_type));
-         return 1;
+         token_errorf("Found duplicate function header that does not have the same return type as the original, found %s expected %s", &tokens[start + 1], shm_type_str(return_type), shm_type_str(function->return_type));
+         error = 1;
       }
+
+      for(int i = 0; i < num_args; ++i){
+         ShmType type = conv_to_shm(tokens[start + (i * 3) + 3].p_type);
+         if(function->types[i] != type){
+            token_errorf("Argument %d type mismatch. Previous %s current %s", &tokens[start + (i * 3) + 3], i, shm_type_str(function->types[i]), shm_type_str(type));
+            error = 1;
+         }
+      }
+
+      if(error) return 1;
+      
    }else{
       function = calloc(1, sizeof(ShmFunc));
       function->num_args = num_args;
       function->return_type = return_type;
+      function->types = calloc(sizeof(ShmType), num_args);
+      for(int i = 0; i < num_args; ++i){
+         function->types[i] = conv_to_shm(tokens[start + (i * 3) + 3].p_type);
+      }
       insert_rmap(&env->funcs, tokens[start + 1].as.word, SHM_FUNC, (MultiVal){.func = function});
       log_msg("MEMROY: Allocating New Function");
       log_str("FUNCTION RETURN TYPE", shm_type_str(return_type));
@@ -783,12 +798,9 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
       }
       start_scope();
       function->args = calloc(sizeof(char *), num_args);
-      function->types = calloc(sizeof(ShmType), num_args);
-      while(i < num_args){
-         function->types[i] = conv_to_shm(tokens[start + (i * 3) + 3].p_type);
+      for(int i = 0; i < num_args; ++i){
          function->args[i] = strdup(static_scoped_var(tokens[start + (i * 3) + 4].as.word));
          register_word(function->args[i], function->types[i], &env->variables);
-         i++;
       }
       function->num_tokens = op_index;
       function->initialized = 1;
