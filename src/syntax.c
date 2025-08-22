@@ -149,10 +149,13 @@ int validate_syntax(PToken *tokens, int num_tokens){
          case TYPE_INT:
          case TYPE_FLOAT:
             log_msg("TYPE");
-            if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD)){
+            if(/* in_function == 1 && */ (i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD))){
                token_errorf("Variable type expects word\n", curr_token);
                error = 1;
-            }
+            }/* else if(i + 1 >= num_tokens || !expect_type(tokens, i, E_WORD | E_SEP | E_CLOSE)){
+               token_errorf("Variable type expects word\n", curr_token);
+               error = 1;
+            } */
          break;
 
          case PROTO_FUNC:

@@ -1,4 +1,4 @@
-proto add(int i1, int i2) -> int
+proto add(float i1, int i2) -> int
 
 func add(int i1, int i2) -> int
    return (i1 + i2)
