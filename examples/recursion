@@ -12,3 +12,4 @@ func rec(int i)
 end
 
 rec(0)
+rec(0)
