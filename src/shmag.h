@@ -61,6 +61,14 @@ typedef enum {
 #define SET_RET_INDEX 0x80000000
 #define RET_IS_SET(ret) ((ret & SET_RET_INDEX) && 1)
 
+#define COLOR_PURPLE "\e[0;35m"
+#define COLOR_RED "\e[0;31m"
+#define COLOR_CYAN "\e[0;36m"
+#define COLOR_DEFAULT "\e[0;0m"
+#define PURPLE(str) COLOR_PURPLE str COLOR_DEFAULT
+#define RED(str) COLOR_RED str COLOR_DEFAULT
+#define CYAN(str) COLOR_CYAN str COLOR_DEFAULT
+
 typedef struct _shm_func ShmFunc;
 
 typedef union {
@@ -157,9 +165,9 @@ int validate_syntax(PToken *tokens, int num_tokens);
 int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens);
 int execute_runnable(REnv *env, RToken *runnable, int runnable_len);
 
-#define token_errorf(fmt, ...) _token_errorf(__FILE__, __func__, __LINE__, fmt, __VA_ARGS__)
-
-void _token_errorf(const char *file, const char *func, int line, const char *fmt, const PToken *token, ...);
+#define token_errorf(...) _token_errorf(1, __VA_ARGS__)
+#define token_errorf_no_line(...) _token_errorf(0, __VA_ARGS__)
+void _token_errorf(int show_line, const char *fmt, const PToken *token, ...);
 
 /* Text Formatting */
 const char *ptoken_str(const PToken *ptoken);

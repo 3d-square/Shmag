@@ -381,10 +381,17 @@ int expect_type(const PToken *tokens, int index, int types){
    return 0;
 }
 
-void _token_errorf(const char *file, const char *func, int line, const char *fmt, const PToken *token, ...){
+extern char **file_lines;
+
+void _token_errorf(int show_line, const char *fmt, const PToken *token, ...){
    char buffer[1024];
 
-   sprintf(buffer, "%s::%s[%d] - %s: %s\n", file, func, line, ptoken_str(token), fmt);
+   if(show_line){
+      fprintf(stderr, "Line[%d:%d]: " PURPLE("'%s'") "\n", token->line, token->col, file_lines[token->line - 1]);
+      fprintf(stderr, "              %*s^\n", token->col - 2, "");
+      fprintf(stderr, "              %*s|\n", token->col - 2, "");
+   }
+   sprintf(buffer, RED("Error") ": " CYAN("%s") " - %s\n\n", ptoken_str(token), fmt);
    va_list args;
    va_start(args, token);
    vfprintf(stderr, buffer, args);
