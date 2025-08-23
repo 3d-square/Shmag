@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <cutils/array.h>
 
 const char *skip_whitespace(const char *line){
    const char *tmp = line;
@@ -152,9 +153,12 @@ PToken next_token(const char *line, int curr_line, int *curr_col){
    return new_token;
 }
 
+array_struct(string_array, char *);
+
 /* returns start of next line or NULL */
-const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_tokens, int line_number){
+const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_tokens, int line_number, string_array *str_array){
    int column = 0;
+   const char *line_start = line;
    while(has_next_token(line + column)){
       tokens[*num_tokens] = next_token(line, line_number, &column);
       *num_tokens = *num_tokens + 1;
@@ -169,25 +173,32 @@ const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_toke
 
    line = strchr(line + column, '\n');
    if(line != NULL){
+      array_append(str_array, strndup(line_start, line - line_start));
       if(*(line + 1) == '\0'){
          return NULL;
       }else{
          return line + 1;
       }
    }else{
+      array_append(str_array, strdup(line_start));
       return NULL;
    }
 }
 
+char **file_lines;
+
 void parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
+   string_array str_arr;
+   array_init(&str_arr, 100);
    log_set_file("parser.c");
    log_msg("START PARSING"); 
    int line = 0;
    *num_tokens = 0;
-   while((lines = parse_line_as_tokens(lines, tokens, num_tokens, line))){
+   while((lines = parse_line_as_tokens(lines, tokens, num_tokens, line, &str_arr))){
       line += 1;
    }
    log_msg("");
+   file_lines = str_arr.array;
 }
 
 const char *ptoken_str(const PToken *ptoken){
