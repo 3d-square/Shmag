@@ -188,7 +188,8 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             expr_line = curr->line;
          break;
          case LINE_SEP:
-            if((expr_line = expression_flush_parens(runnable, &op_index)) != 0){
+            // Expression had tokens and there are things on the stack
+            if((expr_line = expression_flush_parens(runnable, &op_index)) != 0 && stack_head > 0){ 
                if(val_stack[stack_head - 1]->p_type == SET_WORD){
                   runnable[op_index++] = to_rtoken(val_stack[stack_head - 1]);
                   if(expression_type() == SHM_DBL){

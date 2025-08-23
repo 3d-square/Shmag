@@ -160,6 +160,8 @@ typedef void (*destroy_func)(ShmObj *obj);
 
 void parse_as_tokens(const char *, PToken *tokens, int *num_tokens);
 
+int is_seperator(char c);
+
 /* Interpreter Stages */
 int validate_syntax(PToken *tokens, int num_tokens);
 int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens);
