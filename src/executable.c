@@ -51,10 +51,8 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
          log_str("RESTORING VARIABLE", func->args[i]);
          insert_rmap(&env->variables, func->args[i], func->types[i], stack[*stack_head + i - func->num_args]);
       }
-      func->initialized--;
-   }else{
-      func->initialized = 1;
    }
+   func->initialized--;
 
    log_msg("RESET STACK");
    if(func->return_type != SHM_NONE){
