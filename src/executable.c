@@ -18,12 +18,20 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
    log_str("CALLING", func->func_name);
 
    // to support recursion save off the values of the previous variables and return index
+   int recursive_call = (func->initialized) > 1;
+   func->initialized++;
+   log_str("FUNCTION IS RECURSIVE", recursive_call ? "YES" : "NO");
+   log_int("RECURSIVE DEPTH", func->initialized - 1);
    
    // Push Arguments to the variables
    for(int i = 0; i < func->num_args; ++i){
       log_str("SET VARIABLE", func->args[i]);
       log_str("VARIABLE TYPE", shm_type_str(func->types[i]));
-      insert_rmap(&env->variables, func->args[i], func->types[i], stack[*stack_head + i - func->num_args]);
+      MultiVal argi = stack[*stack_head + i - func->num_args];
+      if(recursive_call){
+         stack[*stack_head + i - func->num_args] = search_rmap(&env->variables, func->args[i])->as;
+      }
+      insert_rmap(&env->variables, func->args[i], func->types[i], argi);
    }
    int status = execute_tokens(env, stack + *stack_head, func->tokens, func->num_tokens);
 
@@ -36,8 +44,17 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
       delete_rmap(&env->variables, func->args[i], NULL);
    }
 
-   log_msg("RESET STACK");
+   if(recursive_call){
+         log_int("RECURSIVE DEPTH", func->initialized - 1);
+         log_msg("RESTORE VARIABLE");
+      for(int i = 0; i < func->num_args; ++i){
+         log_str("RESTORING VARIABLE", func->args[i]);
+         insert_rmap(&env->variables, func->args[i], func->types[i], stack[*stack_head + i - func->num_args]);
+      }
+   }
+   func->initialized--;
 
+   log_msg("RESET STACK");
    if(func->return_type != SHM_NONE){
       log_msg("SAVING RETURN");
       stack[*stack_head - func->num_args] = stack[*stack_head + status];

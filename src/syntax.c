@@ -206,7 +206,7 @@ int validate_syntax(PToken *tokens, int num_tokens){
                }
             }else if(i > 1 && expect_type(tokens, i - 2, E_WORD)){ // function call
                log_msg("FUNCTION CALL");
-               if(i >= num_tokens || !expect_type(tokens, i, E_CLOSE | E_VALUE | E_OPEN)){
+               if(i >= num_tokens || !expect_type(tokens, i, E_CLOSE | E_VALUE | E_WORD | E_OPEN)){
                   token_errorf("Type or ')' or expression expected after '('", curr_token);
                   error = 1;
                }else{
