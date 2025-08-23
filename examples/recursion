@@ -1,0 +1,14 @@
+func rec(int i)
+
+   if i > 5
+      return
+   else
+      . i
+      rec(i + 1)
+   end
+
+   return
+
+end
+
+rec(0)
