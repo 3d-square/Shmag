@@ -40,6 +40,44 @@ void read_to_buffer(const char *file_name, char *buffer, int max_length){
    fclose(f);
 }
 
+int word_seperated(const char *line, const char *word){
+   const char *found = strstr(line, word);
+
+   if(found){
+      int end_sep = is_seperator(*(found + strlen(word)));
+      if(found == line && end_sep){
+         return 1;
+      }else if( end_sep && is_seperator(*(found - 1))){
+         return 1;
+      }
+   }
+   
+   return 0;
+}
+
+void read_idle_input(char _buffer[8192]){
+   char line[256];
+   int open_scope = 0;
+   _buffer[0] = '\0';
+
+   printf(">>> ");
+   fflush(stdout);
+
+   while(1){
+      fgets(line, sizeof(line), stdin);
+      if(word_seperated(line, "if") || word_seperated(line, "elif") || word_seperated(line, "else") || word_seperated(line, "while") || word_seperated(line, "func")){
+         open_scope++;
+      }else if(word_seperated(line, "end")){
+         open_scope--;
+      }
+      strcat(_buffer, line);
+      if(open_scope == 0) break;
+
+      printf("    ");
+      fflush(stdout);
+   }
+}
+
 int main(int argc, char **argv){
    int num_tokens;
    int runnable_len;
@@ -51,9 +89,8 @@ int main(int argc, char **argv){
 
    log_start();
    if(argc < 2){
-      printf(">>> ");
-      fflush(stdin);
-      while(fgets(buffer, sizeof(buffer), stdin)){
+      while(1){
+         read_idle_input(buffer);
          num_tokens = 0;
          if(strcmp(buffer, "exit\n") == 0){
             break;
@@ -70,9 +107,6 @@ int main(int argc, char **argv){
                execute_runnable(&env, runnable, runnable_len);
             }
          }
-
-         printf(">>> ");
-         fflush(stdin);
       }
       destroy_rmap(&env.funcs, free_shm_function);
    }else{

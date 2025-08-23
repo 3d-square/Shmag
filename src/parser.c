@@ -15,7 +15,7 @@ const char *skip_whitespace(const char *line){
 }
 
 int is_seperator(char c){
-   return strchr("_+-=:<>?,/!@#$%^&*() \n\t\r", c) != NULL;
+   return strchr("+-=:<>?,/!@#$%^&*() \n\t\r", c) != NULL;
 }
 
 int has_next_token(const char *line){
@@ -298,6 +298,9 @@ const char *ptoken_str(const PToken *ptoken){
       break;
       case ARROW:
          sprintf(_buffer, "Arrow");
+      break;
+      case CALL:
+         sprintf(_buffer, "Call(%s)", ptoken->as.word);
       break;
       default:
          return "Unimplemented";
