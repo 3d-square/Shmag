@@ -298,18 +298,27 @@ void perform_shm_operation(TokenType op, MultiVal *lhs, MultiVal rhs){
 }
 
 void free_function(ShmFunc *func){
-   free(func->func_name);
-   for(int i = 0; i < func->num_args; ++i){
-      free(func->args[i]);
-   }
-   free(func->args);
+   if(func->initialized){
+      free(func->func_name);
+      for(int i = 0; i < func->num_args; ++i){
+         free(func->args[i]);
+      }
+      free(func->args);
 
-   free_rtokens(func->tokens, func->num_tokens);
-   free(func->tokens);
+      free_rtokens(func->tokens, func->num_tokens);
+      free(func->tokens);
+   }
+
+   free(func->types);
    free(func);
 }
 
 void free_shm_function(ShmObj *func){
+   if(func->obj_type != SHM_FUNC){
+      fprintf(stderr, "Unable to free ShmObj %s with free_shm_function\n", shm_type_str(func->obj_type));
+      return;
+   }
+
    free_function(func->as.func);
 }
 

@@ -82,10 +82,12 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
    int op_index = 0;
    PToken *val_stack[1000];
    ShmFunc *func_info;
+   ShmObj *obj;
    int stack_head = 0;
    int expr_line = 0;
    int size;
    int j;
+   int error = 0;
    
    for(int i = 0; i < num_tokens; ++i){
       log_msg("");
@@ -246,7 +248,14 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          case CALL:
             // Verify number of arguments
             size = 0;
-            func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
+            obj = search_rmap(&env->funcs, curr->as.word);
+      
+            if(!obj){
+               token_errorf("Function being called has not been defined yet", curr);
+               return -1;
+            }
+   
+            func_info = obj->as.func;
             if(tokens[i + 2].p_type != PAREN_CLOSE){
                j = i + 2;
                size = 1;
@@ -276,9 +285,14 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
 
             if(func_info->return_type != SHM_NONE && tokens[i + 1].p_type == LINE_SEP){
                token_errorf("The current function expects value to be returned", curr);
-               return -1;
+               error = 1;
             }else if(func_info->return_type == SHM_NONE && tokens[i + 1].p_type != LINE_SEP){
                token_errorf("The current function expects no values to be returned", curr);
+               error = 1;
+            }
+
+            if(error){
+               delete_rmap(&env->funcs, val_stack[j]->as.word, free_shm_function);
                return -1;
             }
 
@@ -759,7 +773,8 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
       if(function->num_args != num_args){
          log_msg("ERROR: Function Arg Mismatch");
          token_errorf("Found duplicate function header that does not have the same number of args as the original, found %d expected %d", &tokens[start + 1], num_args, function->num_args);
-         return 1;
+
+         error = 2;
       }
 
       if(function->return_type != return_type){
@@ -768,7 +783,7 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
          error = 1;
       }
 
-      for(int i = 0; i < num_args; ++i){
+      for(int i = 0; i < num_args && error != 2; ++i){
          ShmType type = conv_to_shm(tokens[start + (i * 3) + 3].p_type);
          if(function->types[i] != type){
             token_errorf("Argument %d type mismatch. Previous %s current %s", &tokens[start + (i * 3) + 3], i, shm_type_str(function->types[i]), shm_type_str(type));
@@ -776,7 +791,13 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
          }
       }
 
-      if(error) return 1;
+      if(error > 0){
+         if(!function->initialized){
+            delete_rmap(&env->funcs, tokens[start + 1].as.word, free_shm_function);
+         }
+   
+         return 1;
+      }
       
    }else{
       function = calloc(1, sizeof(ShmFunc));
@@ -807,7 +828,6 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
       function->initialized = 1;
       function->func_name = strdup(tokens[start + 1].as.word);
    }
-
 
    return 0;
 }
