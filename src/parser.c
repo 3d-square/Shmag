@@ -153,8 +153,6 @@ PToken next_token(const char *line, int curr_line, int *curr_col){
    return new_token;
 }
 
-array_struct(string_array, char *);
-
 /* returns start of next line or NULL */
 const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_tokens, int line_number, string_array *str_array){
    int column = 0;
@@ -186,9 +184,10 @@ const char *parse_line_as_tokens(const char *line, PToken *tokens, int *num_toke
 }
 
 char **file_lines;
+string_array str_arr;
 
-void parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
-   string_array str_arr;
+// Returns the lines read by the file
+string_array *parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
    array_init(&str_arr, 100);
    log_set_file("parser.c");
    log_msg("START PARSING"); 
@@ -199,6 +198,7 @@ void parse_as_tokens(const char *lines, PToken *tokens, int *num_tokens){
    }
    log_msg("");
    file_lines = str_arr.array;
+   return &str_arr;
 }
 
 const char *ptoken_str(const PToken *ptoken){
@@ -300,7 +300,7 @@ const char *ptoken_str(const PToken *ptoken){
          sprintf(_buffer, "Arrow");
       break;
       case CALL:
-         sprintf(_buffer, "Call(%s)", ptoken->as.word);
+         sprintf(_buffer, "CallFunction(%ld)", ptoken->as.decimal);
       break;
       default:
          return "Unimplemented";

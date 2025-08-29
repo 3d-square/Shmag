@@ -2,6 +2,7 @@
 #define __SHMAG__
 
 #include <stdarg.h>
+#include <cutils/array.h>
 
 typedef enum {
    LINE_SEP,
@@ -118,17 +119,7 @@ typedef struct  _shm_func{
    int initialized; 
 } ShmFunc;
 
-typedef struct node {
-   char *key;
-   ShmObj obj;
-   struct node *next;
-} RNode;
-
 #define MAX_BUCKETS 27
-typedef struct hashMap{
-   int num_elems;
-   RNode *arr[MAX_BUCKETS];
-} RMap;
 
 typedef struct v_node {
    char *key;
@@ -141,6 +132,13 @@ typedef struct v_hashMap{
    VNode *arr[MAX_BUCKETS];
 } VMap;
 
+/* typedef struct r_mapiter{
+   int bucket;
+   int done;
+   RNode *curr;
+   RMap *map;
+} RMapIter; */
+
 typedef struct s_node {
    char *key;
    struct s_node *next;
@@ -151,25 +149,30 @@ typedef struct s_set{
    SNode *arr[MAX_BUCKETS];
 } SSet;
 
+array_struct(func_array, ShmFunc *);
+
 typedef struct {
-   RMap variables;
-   RMap funcs;
+   VMap variables;
+   func_array funcs;
 } REnv;
 
-typedef void (*destroy_func)(ShmObj *obj);
+typedef void (*destroy_func)(void *ptr);
 
-void parse_as_tokens(const char *, PToken *tokens, int *num_tokens);
+array_struct(string_array, char *);
+string_array *parse_as_tokens(const char *, PToken *tokens, int *num_tokens);
 
 int is_seperator(char c);
 
 /* Interpreter Stages */
 int validate_syntax(PToken *tokens, int num_tokens);
-int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens);
+int build_runnable(PToken *tokens, int num_tokens, REnv *env, VMap *func_table, RToken *runnable, int *num_run_tokens);
 int execute_runnable(REnv *env, RToken *runnable, int runnable_len);
 
 #define token_errorf(...) _token_errorf(1, __VA_ARGS__)
 #define token_errorf_no_line(...) _token_errorf(0, __VA_ARGS__)
 void _token_errorf(int show_line, const char *fmt, const PToken *token, ...);
+
+ShmObj *create_shmobj(ShmType type, MultiVal value);
 
 /* Text Formatting */
 const char *ptoken_str(const PToken *ptoken);
@@ -179,6 +182,7 @@ void print_rtoken(const RToken *rtoken);
 const char *shm_type_str(ShmType type);
 void log_executable(const char *name, RToken *exe, int len);
 void free_shm_function(ShmObj *func);
+void free_function(ShmFunc *func);
 void free_rtokens(RToken *tokens, int num_tokens);
 
 // setup/cleanup/inspect scope
@@ -186,26 +190,22 @@ void start_scope();
 void end_scope();
 char *static_scoped_var(const char *var);
 char *offset_scoped_var(const char *var, int offset);
-char *find_scoped_variable(char *word, RMap *map);
+char *find_scoped_variable(char *word, VMap *map);
 
 /* Map Functions */
-void delete_rmap(RMap *map, const char *key, destroy_func del);
-void insert_rmap(RMap *map, const char *key, ShmType type, MultiVal value);
-ShmObj *search_rmap(RMap *map, const char *key);
-RNode *node_search_rmap(RMap *map, const char *key, int *hash);
-void destroy_rmap(RMap *map, destroy_func del);
-
 int hash_function(const char *key);
-
-void delete_vmap(VMap *map, const char *key);
-void insert_vmap(VMap *map, const char *key, void *value);
-void *search_vmap(VMap *map, const char *key);
-VNode *node_search_vmap(VMap *map, const char *key, int *hash);
-
+void map_remove(VMap *map, const char *key, destroy_func func);
+void map_delete(VMap *map, destroy_func func);
+void map_insert(VMap *map, const char *key, void *value);
+void **map_get(VMap *map, const char *key);
+int map_has(VMap *map, const char *key);
+VNode *node_search_map(VMap *map, const char *key, int *hash);
+/*
 void set_add(SSet *set, const char *key);
 void set_remove(SSet *set, const char *key);
 int  set_contains(SSet *set, const char *key);
 SNode *node_search_set(SSet *map, const char *key, int *hash);
+*/
 
 void print_function(const ShmFunc *func_info);
 

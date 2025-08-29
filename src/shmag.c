@@ -12,12 +12,6 @@ void log_executable(const char *name, RToken *exe, int len){
    log_msg("END EXECUTABLE\n");
 }
 
-void print_im(PToken *exe, int len){
-   for(int i = 0; i < len; ++i){
-      printf("%d: %s\n", i, ptoken_str(&exe[i]));
-   }
-}
-
 void read_to_buffer(const char *file_name, char *buffer, int max_length){
    FILE *f = fopen(file_name, "r");
    if(f == NULL){
@@ -84,8 +78,12 @@ int main(int argc, char **argv){
    PToken tokens[1000];
    RToken runnable[1000];
    REnv env = {0};
+   VMap func_table = {0};
+   string_array *lines;
+   array_init(&env.funcs, 100);
    char buffer[8192] = {0};
    char file_name[64];
+   int result = 0;
 
    log_start();
    if(argc < 2){
@@ -100,34 +98,43 @@ int main(int argc, char **argv){
             read_to_buffer(file_name, buffer, 8192);
          }
    
-         parse_as_tokens(buffer, tokens, &num_tokens);
+         lines = parse_as_tokens(buffer, tokens, &num_tokens);
 
          if(validate_syntax(tokens, num_tokens) != -1){
-            if(build_runnable(tokens, num_tokens, &env, runnable, &runnable_len) != -1){
-               execute_runnable(&env, runnable, runnable_len);
+            if(build_runnable(tokens, num_tokens, &env, &func_table, runnable, &runnable_len) != -1){
+               result = execute_runnable(&env, runnable, runnable_len);
             }
          }
       }
-      destroy_rmap(&env.funcs, free_shm_function);
    }else{
       read_to_buffer(argv[1], buffer, 8192);
 
-      parse_as_tokens(buffer, tokens, &num_tokens);
+      lines = parse_as_tokens(buffer, tokens, &num_tokens);
 
       if(validate_syntax(tokens, num_tokens) != -1){
-         if(build_runnable(tokens, num_tokens, &env, runnable, &runnable_len) != -1){
+         if(build_runnable(tokens, num_tokens, &env, &func_table, runnable, &runnable_len) != -1){
             log_executable(argv[1], runnable, runnable_len);
             execute_runnable(&env, runnable, runnable_len);
-            destroy_rmap(&env.funcs, free_shm_function);
             free_rtokens(runnable, runnable_len);
          }else{
-            return 1;
+            result = 1;
          }
       }else{
-         return 1;
+         result = 1;
       }
-      log_stop();
+      for(int i = 0; i < lines->length; ++i){
+         free(lines->array[i]);
+      }
+      array_delete(lines);
    }
+   log_stop();
 
-   return 0;
+
+   for(int i = 0; i < env.funcs.length; ++i){
+      free_function(env.funcs.array[i]);
+   }
+   map_delete(&func_table, NULL);
+   array_delete(&env.funcs);
+
+   return result;
 }

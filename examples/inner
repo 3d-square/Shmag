@@ -1,0 +1,13 @@
+func outer()
+
+   func inner(int i)
+      . i
+   end
+
+
+   inner(5)
+   inner(15)
+end
+
+outer()
+outer()

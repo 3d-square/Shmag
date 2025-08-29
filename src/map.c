@@ -3,6 +3,20 @@
 #include <string.h>
 #include <stdio.h>
 
+int hash_function(const char *key){
+   int sum    = 0,
+       factor = 31;
+
+   for(int i = 0; i < (int)strlen(key); ++i){
+      sum = ((sum % MAX_BUCKETS) + (((int)key[i]) * factor) % MAX_BUCKETS) %MAX_BUCKETS;
+
+      factor = ((factor % __INT16_MAX__) * (31 % __INT16_MAX__)) % __INT16_MAX__;
+   }
+
+   return sum;
+}
+
+
 VNode *node_search_vmap(VMap *map, const char *key, int *hash){
    int bucket = hash_function(key);
    *hash = bucket;
@@ -19,7 +33,12 @@ VNode *node_search_vmap(VMap *map, const char *key, int *hash){
    return NULL;
 }
 
-void *search_vmap(VMap *map, const char *key){
+int map_has(VMap *map, const char *key){
+   int hash;
+   return node_search_vmap(map, key, &hash) != NULL;
+}
+
+void **map_get(VMap *map, const char *key){
    int hash;
    VNode *node = node_search_vmap(map, key, &hash);
 
@@ -30,7 +49,7 @@ void *search_vmap(VMap *map, const char *key){
    return NULL;
 }
 
-void insert_vmap(VMap *map, const char *key, void *value){
+void map_insert(VMap *map, const char *key, void *value){
    int bucket;
    VNode *node = node_search_vmap(map, key, &bucket);
 
@@ -52,7 +71,7 @@ void insert_vmap(VMap *map, const char *key, void *value){
    }
 }
 
-void delete_vmap(VMap *map, const char *key){
+void map_remove(VMap *map, const char *key, destroy_func del){
    int bucket = hash_function(key);
 
    VNode *prev = NULL;
@@ -66,6 +85,9 @@ void delete_vmap(VMap *map, const char *key){
             prev->next = curr->next;
          }
 
+         if(del){
+            del(curr->data);
+         }
          free(curr->key);
          free(curr);
          break;
@@ -73,5 +95,21 @@ void delete_vmap(VMap *map, const char *key){
 
       prev = curr;
       curr = curr->next;
+   }
+}
+
+void map_delete(VMap *map, destroy_func del){
+   for(int i = 0; i < MAX_BUCKETS; ++i){
+      VNode *curr = map->arr[i];
+      while(curr){
+         VNode *next = curr->next;
+         if(del){
+            del(curr->data);
+         }
+         free(curr->key);
+         free(curr);
+
+         curr = next;
+      }
    }
 }
