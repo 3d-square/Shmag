@@ -29,9 +29,10 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
       log_str("VARIABLE TYPE", shm_type_str(func->types[i]));
       MultiVal argi = stack[*stack_head + i - func->num_args];
       if(recursive_call){
-         stack[*stack_head + i - func->num_args] = search_rmap(&env->variables, func->args[i])->as;
+         stack[*stack_head + i - func->num_args] = ((ShmObj *)(*map_get(&env->variables, func->args[i])))->as;
       }
-      insert_rmap(&env->variables, func->args[i], func->types[i], argi);
+
+      map_insert(&env->variables, func->args[i], create_shmobj(func->types[i], argi));
    }
    int status = execute_tokens(env, stack + *stack_head, func->tokens, func->num_tokens);
 
@@ -41,7 +42,7 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
    // Pop args on the stack
    for(int i = 0; i < func->num_args; ++i){
       log_str("DELETE", func->args[i]);
-      delete_rmap(&env->variables, func->args[i], NULL);
+      map_remove(&env->variables, func->args[i], free);
    }
 
    if(recursive_call){
@@ -49,7 +50,8 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
          log_msg("RESTORE VARIABLE");
       for(int i = 0; i < func->num_args; ++i){
          log_str("RESTORING VARIABLE", func->args[i]);
-         insert_rmap(&env->variables, func->args[i], func->types[i], stack[*stack_head + i - func->num_args]);
+         // insert_rmap(&env->variables, func->args[i], func->types[i], );
+         ((ShmObj *)*map_get(&env->variables, func->args[i]))->as = stack[*stack_head + i - func->num_args];
       }
    }
    func->initialized--;
@@ -72,6 +74,7 @@ int execute_function(REnv *env, ShmFunc *func, MultiVal *stack, int *stack_head)
 
 int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_len){
    log_set_file("executable.c");
+   void **map_data = NULL;
    ShmObj *obj_ptr;
    int op_index = 0;
    int stack_head = 0;
@@ -95,11 +98,12 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
          break;
          case SET_WORD:
             ShmType word_type = WORD_IS_DBL(curr->r_type) ? SHM_DBL : SHM_INT;
-            insert_rmap(&env->variables, curr->as.word, word_type, stack[stack_head - 1]);
+            map_insert(&env->variables, curr->as.word, create_shmobj(word_type, stack[stack_head - 1]));
             stack_head--;
          break;
          case WORD:
-            if((obj_ptr = search_rmap(&env->variables, curr->as.word)) != NULL){
+            if((map_data = map_get(&env->variables, curr->as.word)) != NULL){
+               obj_ptr = (ShmObj *)(*map_data);
                log_obj("LOAD WORD", obj_ptr);
                stack[stack_head++] = obj_ptr->as;
             }else{
@@ -126,7 +130,7 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
             stack_head--;
          break;
          case CALL:
-            ShmFunc *func_info = search_rmap(&env->funcs, curr->as.word)->as.func;
+            ShmFunc *func_info = env->funcs.array[curr->as.decimal];
             execute_function(env, func_info, stack, &stack_head);
          break;
          case RETURN:
@@ -137,7 +141,7 @@ int execute_tokens(REnv *env, MultiVal *stack, RToken *runnable, int runnable_le
             return 0;
          break;
          case DEL_VAR:
-            delete_rmap(&env->variables, curr->as.word, NULL);
+            map_remove(&env->variables, curr->as.word, NULL);
          break;
          default:
             printf("[EXECUTABLE]: %s is not implemented\n", rtoken_str(curr));
@@ -323,7 +327,6 @@ void free_shm_function(ShmObj *func){
 }
 
 void free_rtokens(RToken *tokens, int num_tokens){
-   return;
    for(int i = 0; i < num_tokens; ++i){
       switch(tokens[i].r_type){
          case SET_WORD:
@@ -335,4 +338,11 @@ void free_rtokens(RToken *tokens, int num_tokens){
          break;
       }
    }
+}
+
+ShmObj *create_shmobj(ShmType type, MultiVal value){
+   ShmObj *new_obj = calloc(1, sizeof(ShmObj));
+   new_obj->obj_type = type;
+   new_obj->as = value;
+   return new_obj;
 }

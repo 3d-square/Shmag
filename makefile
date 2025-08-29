@@ -1,6 +1,6 @@
 CC=gcc
 CPP=g++
-CFLAGS=-Wall -Wextra
+CFLAGS=-Wall -Wextra -Werror -Wfatal-errors
 INC=-I./src/
 
 SRCS=$(wildcard src/*)

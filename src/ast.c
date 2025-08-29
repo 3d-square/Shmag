@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <cutils/array.h>
 
 RToken to_rtoken(PToken *tkn){
    log_msg("PTOKEN TO RTOKEN");
@@ -64,31 +65,34 @@ static struct {
 
 static int scope_prefix = '\0';
 
-void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map);
+void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, VMap *map);
 int expression_flush(RToken *runnable, int *num_run_tokens);
 int expression_flush_parens(RToken *runnable, int *num_run_tokens);
 void encode_operand(RToken *tkn);
-void register_word(const char *word, ShmType type, RMap *map);
-void deregister_word(const char *word, RMap *map);
+void register_word(const char *word, ShmType type, VMap *map);
+void deregister_word(const char *word, VMap *map);
 void check_init_shm(RToken *runnable, int *num_run_tokens);
-int parse_function_header(REnv *env, PToken *tokens, int start, int op_index);
-char *scoped_in_map(char *word, RMap *map);
+int parse_function_header(REnv *env, VMap *func_table, PToken *tokens, int start, int op_index);
+char *scoped_in_map(char *word, VMap *map);
 ShmType expression_type();
-ShmType is_word_registered(const char *word, RMap *map);
+ShmType is_word_registered(const char *word, VMap *map);
 ShmType conv_to_shm(TokenType type);
 
-int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, int *num_run_tokens){
+int build_runnable(PToken *tokens, int num_tokens, REnv *env, VMap *func_table, RToken *runnable, int *num_run_tokens){
    log_set_file("ast.c");
    log_msg("BUILDING EXECUTABLE");
    int op_index = 0;
    PToken *val_stack[1000];
    ShmFunc *func_info;
-   ShmObj *obj;
+   void **map_val;
+   long func_index;
    int stack_head = 0;
    int expr_line = 0;
    int size;
    int j;
    int error = 0;
+
+   // Initialize func_table;
    
    for(int i = 0; i < num_tokens; ++i){
       log_msg("");
@@ -113,7 +117,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          break;
          case PROTO_FUNC:
             log_msg("FUNCTION PROTOTYPE");
-            if(parse_function_header(env, tokens, i, op_index)){
+            if(parse_function_header(env, func_table, tokens, i, op_index)){
                return -1;
             }
             // Skip function prototype
@@ -124,7 +128,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          break;
          case FUNC:
             log_msg("FUNCTION DEFINITION");
-            if(parse_function_header(env, tokens, i, op_index)){
+            if(parse_function_header(env, func_table, tokens, i, op_index)){
                return -1;
             }
             val_stack[stack_head++] = curr;
@@ -240,7 +244,8 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
 
                   // Check if next token is END. There always has to be a ret before the final end
                   if(tokens[i + 1].p_type == END && val_stack[stack_head - 1]->p_type == FUNC){
-                     func_info = search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func;
+                     func_index = (long)(*map_get(func_table, val_stack[stack_head - 1]->as.word));
+                     func_info = env->funcs.array[func_index];
                      func_info->has_return = 1;
                   }
                }
@@ -250,20 +255,23 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             // Verify number of arguments
             size = 0;
 
-            char *scoped_func = scoped_in_map(curr->as.word, &env->funcs);
+            char *scoped_func = scoped_in_map(curr->as.word, func_table);
             if(!scoped_func){
+               free(scoped_func);
                token_errorf("Function being called has not been defined yet", curr);
                return -1;
             }
 
-            obj = search_rmap(&env->funcs, scoped_func);
+            map_val = map_get(func_table, scoped_func); // Contains pointer to func_index
+            free(scoped_func);
       
-            if(!obj){
+            if(!map_val){
                token_errorf("Function being called has not been defined yet", curr);
                return -1;
             }
    
-            func_info = obj->as.func;
+            func_index = (long)(*map_val);
+            func_info = env->funcs.array[func_index];
             if(tokens[i + 2].p_type != PAREN_CLOSE){
                j = i + 2;
                size = 1;
@@ -278,7 +286,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                return -1;
             }
 
-            curr->as.word = scoped_func;
+            curr->as.decimal = func_index;
             val_stack[stack_head++] = curr;
          break;
 
@@ -287,7 +295,9 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
             for(j = stack_head - 1; j >= 0; j--){
                if(val_stack[j]->p_type == FUNC){ // This is garanteed to happen once
                   log_msg("FOUND FUNCTION INFO");
-                  func_info = search_rmap(&env->funcs, val_stack[j]->as.word)->as.func;
+                  map_val = map_get(func_table, val_stack[j]->as.word);
+                  func_index = (long)*map_val;
+                  func_info = env->funcs.array[func_index];
                   break;
                }
             }
@@ -300,8 +310,9 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                error = 1;
             }
 
+            // For idle
             if(error){
-               delete_rmap(&env->funcs, val_stack[j]->as.word, free_shm_function);
+            //    delete_vmap(&func_table, val_stack[j]->as.word, NULL);
                return -1;
             }
 
@@ -326,7 +337,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
          case PAREN_CLOSE:
             // once ) is reached pop function from stack
             if(stack_head > 0 && val_stack[stack_head - 1]->p_type == CALL){
-               func_info = search_rmap(&env->funcs, val_stack[stack_head - 1]->as.word)->as.func;
+               func_info = env->funcs.array[val_stack[stack_head - 1]->as.decimal];
                if(func_info->num_args > 0){
                   expression_flush_parens(runnable, &op_index);
                   
@@ -389,14 +400,15 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
                stack_head--;
             }else if(val_stack[stack_head - 1]->p_type == FUNC){
                // Calculate size of the function
-               char *func_name = scoped_in_map(val_stack[stack_head - 1]->as.word, &env->funcs);
+               char *func_name = scoped_in_map(val_stack[stack_head - 1]->as.word, func_table);
                if(func_name == NULL){
                   fprintf(stderr, "Something went wrong\n");
                   return -1;
                }
 
-               ShmObj *func_obj = search_rmap(&env->funcs, func_name);
-               ShmFunc *func_info = func_obj->as.func;
+               func_index = (long)*map_get(func_table, func_name);
+               free(func_name);
+               func_info = env->funcs.array[func_index];
 
                for(int arg_i = 0; arg_i < func_info->num_args; ++arg_i){
                   deregister_word(func_info->args[arg_i], &env->variables);
@@ -440,7 +452,7 @@ int build_runnable(PToken *tokens, int num_tokens, REnv *env, RToken *runnable, 
    return 0;
 }
 
-void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, RMap *map){
+void expression_push(PToken *tkn, RToken *runnable, int *num_run_tokens, VMap *map){
    log_msg("EXPRESSION PUSH");
    if(expression.line == -1){
       expression.type = SHM_INT;
@@ -622,7 +634,7 @@ const char *rtoken_str(const RToken *rtoken){
          sprintf(_buffer, "Return");
       break;
       case CALL:
-         sprintf(_buffer, "Call(%s)", rtoken->as.word);
+         sprintf(_buffer, "CallFunction(%ld)", rtoken->as.decimal);
       break;
       case DEL_VAR:
          sprintf(_buffer, "Del(%s)", rtoken->as.word);
@@ -662,7 +674,7 @@ void encode_operand(RToken *tkn){
    
 }
 
-void register_word(const char *word, ShmType type, RMap *map){
+void register_word(const char *word, ShmType type, VMap *map){
    if(registered_words.size >= 100){
       fprintf(stderr, "too many words registered\n");
       exit(1);
@@ -678,9 +690,9 @@ void register_word(const char *word, ShmType type, RMap *map){
    }
 }
 
-void deregister_word(const char *word, RMap *map){
+void deregister_word(const char *word, VMap *map){
    log_str("UNREGISTER", word);
-   if(search_rmap(map, word)){
+   if(map_has(map, word)){
       fprintf(stderr, "Warning: Unable to deregister external token\n");
       log_msg("WARNING: Unable to deregister external token");
    }else{
@@ -696,11 +708,11 @@ void deregister_word(const char *word, RMap *map){
    }
 }
 
-char *scoped_in_map(char *word, RMap *map){
+char *scoped_in_map(char *word, VMap *map){
    log_msg("FINDING IN SCOPED MAP");
    for(int scope_offset = 0; scope_offset <= scope_prefix; scope_offset++){
       char *scoped_word = offset_scoped_var(word, scope_offset);
-      if(search_rmap(map, scoped_word)){
+      if(map_has(map, scoped_word)){
          log_str("FOUND", scoped_word);
          free(word);
          return strdup(scoped_word);
@@ -709,9 +721,9 @@ char *scoped_in_map(char *word, RMap *map){
    return NULL;
 }
 
-char *find_scoped_variable(char *word, RMap *map){
+char *find_scoped_variable(char *word, VMap *map){
    log_str("FINDING SCOPED VARIABLE", word);
-   if(search_rmap(map, word) != NULL){
+   if(map_get(map, word) != NULL){
       return word;
    }else{
       for(int i = 0; i < registered_words.size; ++i){
@@ -732,15 +744,17 @@ char *find_scoped_variable(char *word, RMap *map){
    return NULL;
 }
 
-ShmType is_word_registered(const char *word, RMap *map){
+ShmType is_word_registered(const char *word, VMap *map){
    ShmType result = SHM_NULL;
+   void **obj_ptr;
    ShmObj *obj;
 
    if(word == NULL){
       return SHM_NULL;
    }
 
-   if((obj = search_rmap(map, word)) != NULL){
+   if((obj_ptr = map_get(map, word)) != NULL){
+      obj = (ShmObj *)(*obj_ptr);
       result = obj->obj_type;
    }else{
       for(int i = 0; i < registered_words.size; ++i){
@@ -756,19 +770,19 @@ ShmType is_word_registered(const char *word, RMap *map){
    return result;
 }
 
-int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
+int parse_function_header(REnv *env, VMap *func_table, PToken *tokens, int start, int op_index){
    int is_proto = tokens[start].p_type == PROTO_FUNC;
    log_str("PARSING FUNCTION", is_proto ? "PROTOTYPE" : "BODY");
    const char *func_name = offset_scoped_var(tokens[start + 1].as.word, 0);
    log_str("SCOPED FUNCTION", func_name);
 
-   if(search_rmap(&env->variables, func_name)){
+   if(map_has(&env->variables, func_name)){
       token_errorf("Cannot be used as both a variable and a function", &tokens[start + 1]);
       return 1;
    }
 
-   ShmObj *func_wrapper = search_rmap(&env->funcs, func_name);
-   int found = func_wrapper != NULL;
+   int found = map_has(func_table, func_name);
+
    log_str("FUNCTION", found ? "FOUND" : "NOT FOUND");
    ShmFunc *function;
    ShmType return_type = SHM_NONE;
@@ -799,7 +813,8 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
 
    if(found){
       // check if the number of args are the same
-      function = func_wrapper->as.func;
+      long func_index = (long)(*map_get(func_table, func_name));
+      function = env->funcs.array[func_index];
       int error = 0;
       if(function->num_args != num_args){
          log_msg("ERROR: Function Arg Mismatch");
@@ -824,7 +839,7 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
 
       if(error > 0){
          if(!function->initialized){
-            delete_rmap(&env->funcs, func_name, free_shm_function);
+            free_function(function);
          }
    
          return 1;
@@ -835,11 +850,13 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
       function->num_args = num_args;
       function->return_type = return_type;
       function->types = calloc(sizeof(ShmType), num_args);
+      function->func_name = strdup(func_name);
       for(int i = 0; i < num_args; ++i){
          function->types[i] = conv_to_shm(tokens[start + (i * 3) + 3].p_type);
       }
       log_str("INSERTING", func_name);
-      insert_rmap(&env->funcs, func_name, SHM_FUNC, (MultiVal){.func = function});
+      map_insert(func_table, func_name, (void *)((long)env->funcs.length));
+      array_append(&env->funcs, function);
       log_msg("MEMROY: Allocating New Function");
       log_str("FUNCTION RETURN TYPE", shm_type_str(return_type));
    }
@@ -858,7 +875,6 @@ int parse_function_header(REnv *env, PToken *tokens, int start, int op_index){
       }
       function->num_tokens = op_index;
       function->initialized = 1;
-      function->func_name = strdup(func_name);
    }
 
    return 0;
@@ -961,4 +977,23 @@ void log_function(const ShmFunc *func_info){
 
    log_msg("FUNCTION END");
    // This is where I would print a return value
+}
+
+const char *shm_type_str(ShmType type){
+   switch(type){
+      case SHM_INT:
+         return "Integer";
+      case SHM_DBL:
+         return "Float";
+      case SHM_STR:
+         return "String";
+      case SHM_FUNC:
+         return "Function";
+      case SHM_NONE:
+         return "None";
+      case SHM_NULL:
+         return "Unimplemented";
+   }
+
+   return NULL;
 }

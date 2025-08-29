@@ -10,3 +10,4 @@ func outer()
 end
 
 outer()
+outer()
